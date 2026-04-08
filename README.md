@@ -94,11 +94,7 @@ go mod tidy
 go run ./cmd/api
 ```
 
-Если автоприменение выключено, тогда миграцию нужно выполнить вручную:
 
-```bash
-psql "host=localhost port=5432 dbname=soundmarket user=soundmarket password=soundmarket sslmode=disable" -f migrations/001_init.sql
-```
 
 ## Полезные endpoint-ы
 
@@ -123,13 +119,4 @@ psql "host=localhost port=5432 dbname=soundmarket user=soundmarket password=soun
 - `POST /api/v1/payments/webhook`
 - `GET /api/v1/payments/balance`
 
-## Коммиты по этапам
 
-1. `foundation: project structure and runtime config`
-2. `infra: docker compose and init migration`
-3. `auth: registration login and profiles`
-4. `cards: offers requests and search`
-5. `bids: request bids flow`
-6. `orders: transactional order creation and status flow`
-7. `payments: internal ledger and mock yookassa`
-8. `docs: openapi and readme refresh`
