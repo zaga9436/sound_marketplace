@@ -49,6 +49,11 @@ func New() (*App, error) {
 		return nil, err
 	}
 	store := repository.NewPostgresStore(postgresDB)
+	if err := ensureDevAdmin(cfg, store); err != nil {
+		_ = postgresDB.Close()
+		_ = redisClient.Close()
+		return nil, err
+	}
 	storageAdapter := storage.NewS3Adapter(cfg)
 	paymentAdapter := payments.NewMockYooKassaAdapter(cfg)
 	notifier := notifications.NewRepositoryBackedService(store)

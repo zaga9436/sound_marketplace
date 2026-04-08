@@ -15,6 +15,9 @@ type Config struct {
 	AppPort               string
 	AutoApplyMigrations   bool
 	MigrationsDir         string
+	AdminBootstrapEnabled bool
+	AdminBootstrapEmail   string
+	AdminBootstrapPassword string
 	PostgresHost          string
 	PostgresPort          string
 	PostgresDB            string
@@ -80,6 +83,8 @@ func Load() (*Config, error) {
 		AppEnv:              getWithDefault("APP_ENV", "development"),
 		AppPort:             required["APP_PORT"],
 		MigrationsDir:       getWithDefault("MIGRATIONS_DIR", "migrations"),
+		AdminBootstrapEmail: strings.TrimSpace(os.Getenv("ADMIN_BOOTSTRAP_EMAIL")),
+		AdminBootstrapPassword: os.Getenv("ADMIN_BOOTSTRAP_PASSWORD"),
 		PostgresHost:        required["POSTGRES_HOST"],
 		PostgresPort:        required["POSTGRES_PORT"],
 		PostgresDB:          required["POSTGRES_DB"],
@@ -126,6 +131,9 @@ func Load() (*Config, error) {
 	if cfg.AutoApplyMigrations, err = strconv.ParseBool(getWithDefault("AUTO_APPLY_MIGRATIONS", defaultAutoApplyMigrations(cfg.AppEnv))); err != nil {
 		return nil, fmt.Errorf("parse AUTO_APPLY_MIGRATIONS: %w", err)
 	}
+	if cfg.AdminBootstrapEnabled, err = strconv.ParseBool(getWithDefault("ADMIN_BOOTSTRAP_ENABLED", defaultAdminBootstrap(cfg.AppEnv))); err != nil {
+		return nil, fmt.Errorf("parse ADMIN_BOOTSTRAP_ENABLED: %w", err)
+	}
 
 	return cfg, nil
 }
@@ -167,4 +175,11 @@ func defaultAutoApplyMigrations(appEnv string) string {
 		return "false"
 	}
 	return "true"
+}
+
+func defaultAdminBootstrap(appEnv string) string {
+	if strings.EqualFold(appEnv, "production") {
+		return "false"
+	}
+	return "false"
 }
