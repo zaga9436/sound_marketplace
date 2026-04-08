@@ -1,6 +1,8 @@
 package service
 
 import (
+	"fmt"
+
 	"github.com/soundmarket/backend/internal/domain"
 	"github.com/soundmarket/backend/internal/notifications"
 	"github.com/soundmarket/backend/internal/payments"
@@ -8,16 +10,19 @@ import (
 )
 
 type PaymentService struct {
-	store    *repository.MemoryStore
+	store    repository.Store
 	adapter  payments.Adapter
 	notifier notifications.Service
 }
 
-func NewPaymentService(store *repository.MemoryStore, adapter payments.Adapter, notifier notifications.Service) *PaymentService {
+func NewPaymentService(store repository.Store, adapter payments.Adapter, notifier notifications.Service) *PaymentService {
 	return &PaymentService{store: store, adapter: adapter, notifier: notifier}
 }
 
 func (s *PaymentService) CreateDeposit(user domain.User, amount int64) (domain.Payment, error) {
+	if amount <= 0 {
+		return domain.Payment{}, fmt.Errorf("amount must be positive")
+	}
 	result, err := s.adapter.CreatePayment(user.ID, amount)
 	if err != nil {
 		return domain.Payment{}, err
@@ -29,20 +34,53 @@ func (s *PaymentService) CreateDeposit(user domain.User, amount int64) (domain.P
 		Status:      result.Status,
 		Provider:    "yookassa_mock",
 		RedirectURL: result.RedirectURL,
-	}), nil
-}
-
-func (s *PaymentService) ProcessWebhook(userID, externalID string, amount int64) domain.Transaction {
-	tx := s.store.CreateTransaction(domain.Transaction{
-		UserID:     userID,
-		Type:       domain.TransactionTypeDeposit,
-		Amount:     amount,
-		ExternalID: externalID,
 	})
-	s.notifier.Publish(userID, "balance_deposit", "Balance replenished")
-	return tx
 }
 
-func (s *PaymentService) Balance(userID string) int64 {
+func (s *PaymentService) ProcessWebhook(externalID string) (domain.Transaction, error) {
+	var created domain.Transaction
+	err := s.store.WithTx(func(tx repository.Store) error {
+		payment, err := tx.GetPaymentByExternalID(externalID)
+		if err != nil {
+			return err
+		}
+		if payment.Status == "succeeded" {
+			return fmt.Errorf("payment already processed")
+		}
+		if _, err := tx.MarkPaymentSucceeded(externalID); err != nil {
+			return err
+		}
+		created, err = tx.CreateTransaction(domain.Transaction{
+			UserID:     payment.UserID,
+			Type:       domain.TransactionTypeDeposit,
+			Amount:     payment.Amount,
+			ExternalID: payment.ExternalID,
+		})
+		return err
+	})
+	if err != nil {
+		return domain.Transaction{}, err
+	}
+	s.notifier.Publish(created.UserID, "balance_deposit", "Balance replenished")
+	return created, nil
+}
+
+func (s *PaymentService) Refund(order domain.Order, amount int64) (domain.Transaction, error) {
+	if amount <= 0 || amount > order.Amount {
+		return domain.Transaction{}, fmt.Errorf("invalid refund amount")
+	}
+	txType := domain.TransactionTypeRefund
+	if amount < order.Amount {
+		txType = domain.TransactionTypePartialRefund
+	}
+	return s.store.CreateTransaction(domain.Transaction{
+		UserID:  order.CustomerID,
+		OrderID: order.ID,
+		Type:    txType,
+		Amount:  amount,
+	})
+}
+
+func (s *PaymentService) Balance(userID string) (int64, error) {
 	return s.store.GetBalance(userID)
 }

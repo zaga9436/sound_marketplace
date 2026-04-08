@@ -14,6 +14,7 @@ func (Message) Fields() []ent.Field {
 	return []ent.Field{
 		field.Text("body"),
 		field.String("sender_id"),
+		field.Time("created_at"),
 	}
 }
 

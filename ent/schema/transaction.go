@@ -15,6 +15,7 @@ func (Transaction) Fields() []ent.Field {
 		field.Enum("type").Values("deposit", "hold", "release", "refund", "partial_refund"),
 		field.Int64("amount"),
 		field.String("external_id").Optional(),
+		field.Time("created_at"),
 	}
 }
 

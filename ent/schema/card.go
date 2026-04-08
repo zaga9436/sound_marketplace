@@ -19,6 +19,8 @@ func (Card) Fields() []ent.Field {
 		field.Int64("price"),
 		field.Strings("tags").Optional(),
 		field.Bool("is_published").Default(true),
+		field.Time("created_at"),
+		field.Time("updated_at"),
 	}
 }
 

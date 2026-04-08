@@ -16,6 +16,8 @@ func (Order) Fields() []ent.Field {
 		field.Int64("amount"),
 		field.Text("delivery_notes").Optional(),
 		field.Text("dispute_reason").Optional(),
+		field.Time("created_at"),
+		field.Time("updated_at"),
 	}
 }
 

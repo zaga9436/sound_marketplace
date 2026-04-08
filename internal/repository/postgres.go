@@ -1,0 +1,494 @@
+package repository
+
+import (
+	"database/sql"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/lib/pq"
+
+	"github.com/soundmarket/backend/internal/domain"
+)
+
+type sqlRunner interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+}
+
+type PostgresStore struct {
+	db *sql.DB
+	tx *sql.Tx
+}
+
+func NewPostgresStore(db *sql.DB) *PostgresStore {
+	return &PostgresStore{db: db}
+}
+
+func (s *PostgresStore) WithTx(fn func(Store) error) error {
+	if s.tx != nil {
+		return fn(s)
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	child := &PostgresStore{db: s.db, tx: tx}
+	if err := fn(child); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (s *PostgresStore) runner() sqlRunner {
+	if s.tx != nil {
+		return s.tx
+	}
+	return s.db
+}
+
+func (s *PostgresStore) CreateUser(email, passwordHash string, role domain.Role) (domain.User, domain.Profile, error) {
+	var (
+		user    domain.User
+		profile domain.Profile
+	)
+
+	err := s.WithTx(func(txStore Store) error {
+		ps := txStore.(*PostgresStore)
+		now := time.Now().UTC()
+		user = domain.User{
+			ID:           uuid.NewString(),
+			Email:        strings.ToLower(email),
+			PasswordHash: passwordHash,
+			Role:         role,
+			CreatedAt:    now,
+		}
+		profile = domain.Profile{
+			UserID:      user.ID,
+			DisplayName: strings.Split(user.Email, "@")[0],
+			Bio:         "",
+			Rating:      0,
+			CreatedAt:   now,
+		}
+
+		if _, err := ps.runner().Exec(
+			`INSERT INTO users (id, email, password_hash, role, created_at) VALUES ($1, $2, $3, $4, $5)`,
+			user.ID, user.Email, user.PasswordHash, string(user.Role), user.CreatedAt,
+		); err != nil {
+			return err
+		}
+		if _, err := ps.runner().Exec(
+			`INSERT INTO profiles (user_id, display_name, bio, rating, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $5)`,
+			profile.UserID, profile.DisplayName, profile.Bio, profile.Rating, profile.CreatedAt,
+		); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return user, profile, err
+}
+
+func (s *PostgresStore) FindUserByEmail(email string) (domain.User, error) {
+	return s.scanUser(s.runner().QueryRow(
+		`SELECT id, email, password_hash, role, created_at FROM users WHERE email = $1`,
+		strings.ToLower(email),
+	))
+}
+
+func (s *PostgresStore) GetUser(userID string) (domain.User, error) {
+	return s.scanUser(s.runner().QueryRow(
+		`SELECT id, email, password_hash, role, created_at FROM users WHERE id = $1`,
+		userID,
+	))
+}
+
+func (s *PostgresStore) GetProfile(userID string) (domain.Profile, error) {
+	var profile domain.Profile
+	err := s.runner().QueryRow(
+		`SELECT user_id, display_name, bio, rating, created_at FROM profiles WHERE user_id = $1`,
+		userID,
+	).Scan(&profile.UserID, &profile.DisplayName, &profile.Bio, &profile.Rating, &profile.CreatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Profile{}, ErrNotFound
+		}
+		return domain.Profile{}, err
+	}
+	return profile, nil
+}
+
+func (s *PostgresStore) UpdateProfile(userID, displayName, bio string) (domain.Profile, error) {
+	_, err := s.runner().Exec(
+		`UPDATE profiles SET display_name = $2, bio = $3, updated_at = NOW() WHERE user_id = $1`,
+		userID, displayName, bio,
+	)
+	if err != nil {
+		return domain.Profile{}, err
+	}
+	return s.GetProfile(userID)
+}
+
+func (s *PostgresStore) CreateCard(card domain.Card) (domain.Card, error) {
+	if card.Tags == nil {
+		card.Tags = []string{}
+	}
+	card.ID = uuid.NewString()
+	card.CreatedAt = time.Now().UTC()
+	_, err := s.runner().Exec(
+		`INSERT INTO cards (id, author_id, card_type, kind, title, description, price, tags, is_published, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
+		card.ID, card.AuthorID, string(card.CardType), string(card.Kind), card.Title, card.Description, card.Price, pq.Array(card.Tags), card.IsPublished, card.CreatedAt,
+	)
+	if err != nil {
+		return domain.Card{}, err
+	}
+	return card, nil
+}
+
+func (s *PostgresStore) UpdateCard(cardID string, payload domain.Card) (domain.Card, error) {
+	if payload.Tags == nil {
+		payload.Tags = []string{}
+	}
+	_, err := s.runner().Exec(
+		`UPDATE cards SET kind = $2, title = $3, description = $4, price = $5, tags = $6, is_published = $7, updated_at = NOW() WHERE id = $1`,
+		cardID, string(payload.Kind), payload.Title, payload.Description, payload.Price, pq.Array(payload.Tags), payload.IsPublished,
+	)
+	if err != nil {
+		return domain.Card{}, err
+	}
+	return s.GetCard(cardID)
+}
+
+func (s *PostgresStore) ListCards(cardType, query string) ([]domain.Card, error) {
+	base := `SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, created_at FROM cards`
+	args := make([]interface{}, 0, 2)
+	conditions := make([]string, 0, 2)
+
+	if cardType != "" {
+		args = append(args, cardType)
+		conditions = append(conditions, fmt.Sprintf("card_type = $%d", len(args)))
+	}
+	if query != "" {
+		args = append(args, "%"+strings.ToLower(query)+"%")
+		conditions = append(conditions, fmt.Sprintf("(LOWER(title) LIKE $%d OR LOWER(description) LIKE $%d)", len(args), len(args)))
+	}
+	if len(conditions) > 0 {
+		base += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	base += " ORDER BY created_at DESC"
+
+	rows, err := s.runner().Query(base, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cards []domain.Card
+	for rows.Next() {
+		var card domain.Card
+		if err := rows.Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.CreatedAt); err != nil {
+			return nil, err
+		}
+		cards = append(cards, card)
+	}
+	if cards == nil {
+		cards = make([]domain.Card, 0)
+	}
+	return cards, rows.Err()
+}
+
+func (s *PostgresStore) GetCard(cardID string) (domain.Card, error) {
+	var card domain.Card
+	err := s.runner().QueryRow(
+		`SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, created_at FROM cards WHERE id = $1`,
+		cardID,
+	).Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.CreatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Card{}, ErrNotFound
+		}
+		return domain.Card{}, err
+	}
+	return card, nil
+}
+
+func (s *PostgresStore) CreateBid(bid domain.Bid) (domain.Bid, error) {
+	bid.ID = uuid.NewString()
+	bid.CreatedAt = time.Now().UTC()
+	_, err := s.runner().Exec(
+		`INSERT INTO bids (id, request_id, engineer_id, price, message, created_at) VALUES ($1, $2, $3, $4, $5, $6)`,
+		bid.ID, bid.RequestID, bid.EngineerID, bid.Price, bid.Message, bid.CreatedAt,
+	)
+	if err != nil {
+		return domain.Bid{}, err
+	}
+	return bid, nil
+}
+
+func (s *PostgresStore) ListBidsByRequest(requestID string) ([]domain.Bid, error) {
+	rows, err := s.runner().Query(
+		`SELECT id, request_id, engineer_id, price, message, created_at FROM bids WHERE request_id = $1 ORDER BY created_at DESC`,
+		requestID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bids []domain.Bid
+	for rows.Next() {
+		var bid domain.Bid
+		if err := rows.Scan(&bid.ID, &bid.RequestID, &bid.EngineerID, &bid.Price, &bid.Message, &bid.CreatedAt); err != nil {
+			return nil, err
+		}
+		bids = append(bids, bid)
+	}
+	if bids == nil {
+		bids = make([]domain.Bid, 0)
+	}
+	return bids, rows.Err()
+}
+
+func (s *PostgresStore) ListBidsByRequestForAuthor(requestID, authorID string) ([]domain.Bid, error) {
+	rows, err := s.runner().Query(
+		`SELECT b.id, b.request_id, b.engineer_id, b.price, b.message, b.created_at
+		 FROM bids b
+		 JOIN cards c ON c.id = b.request_id
+		 WHERE b.request_id = $1 AND c.author_id = $2 AND c.card_type = 'request'
+		 ORDER BY b.created_at DESC`,
+		requestID, authorID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bids []domain.Bid
+	for rows.Next() {
+		var bid domain.Bid
+		if err := rows.Scan(&bid.ID, &bid.RequestID, &bid.EngineerID, &bid.Price, &bid.Message, &bid.CreatedAt); err != nil {
+			return nil, err
+		}
+		bids = append(bids, bid)
+	}
+	if bids == nil {
+		bids = make([]domain.Bid, 0)
+	}
+	return bids, rows.Err()
+}
+
+func (s *PostgresStore) GetBid(bidID string) (domain.Bid, error) {
+	var bid domain.Bid
+	err := s.runner().QueryRow(
+		`SELECT id, request_id, engineer_id, price, message, created_at FROM bids WHERE id = $1`,
+		bidID,
+	).Scan(&bid.ID, &bid.RequestID, &bid.EngineerID, &bid.Price, &bid.Message, &bid.CreatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Bid{}, ErrNotFound
+		}
+		return domain.Bid{}, err
+	}
+	return bid, nil
+}
+
+func (s *PostgresStore) GetBidByRequestAndEngineer(requestID, engineerID string) (domain.Bid, error) {
+	var bid domain.Bid
+	err := s.runner().QueryRow(
+		`SELECT id, request_id, engineer_id, price, message, created_at FROM bids WHERE request_id = $1 AND engineer_id = $2 ORDER BY created_at DESC LIMIT 1`,
+		requestID, engineerID,
+	).Scan(&bid.ID, &bid.RequestID, &bid.EngineerID, &bid.Price, &bid.Message, &bid.CreatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Bid{}, ErrNotFound
+		}
+		return domain.Bid{}, err
+	}
+	return bid, nil
+}
+
+func (s *PostgresStore) CreateOrder(order domain.Order) (domain.Order, error) {
+	order.ID = uuid.NewString()
+	now := time.Now().UTC()
+	order.CreatedAt = now
+	order.LastStatusTime = now
+	_, err := s.runner().Exec(
+		`INSERT INTO orders (id, card_id, request_id, bid_id, customer_id, engineer_id, amount, status, delivery_notes, dispute_reason, created_at, updated_at)
+		 VALUES ($1, NULLIF($2, ''), NULLIF($3, ''), NULLIF($4, ''), $5, $6, $7, $8, $9, $10, $11, $11)`,
+		order.ID, order.CardID, order.RequestID, order.BidID, order.CustomerID, order.EngineerID, order.Amount, string(order.Status), order.DeliveryNotes, order.DisputeReason, order.CreatedAt,
+	)
+	if err != nil {
+		return domain.Order{}, err
+	}
+	if _, err := s.runner().Exec(
+		`INSERT INTO chat_rooms (id, order_id, created_at) VALUES ($1, $2, $3)`,
+		uuid.NewString(), order.ID, order.CreatedAt,
+	); err != nil {
+		return domain.Order{}, err
+	}
+	return order, nil
+}
+
+func (s *PostgresStore) GetOrder(orderID string) (domain.Order, error) {
+	return s.scanOrder(s.runner().QueryRow(
+		`SELECT id, COALESCE(card_id, ''), COALESCE(request_id, ''), COALESCE(bid_id, ''), customer_id, engineer_id, amount, status, COALESCE(delivery_notes, ''), COALESCE(dispute_reason, ''), created_at, updated_at
+		 FROM orders WHERE id = $1`,
+		orderID,
+	))
+}
+
+func (s *PostgresStore) GetOrderByBidID(bidID string) (domain.Order, error) {
+	return s.scanOrder(s.runner().QueryRow(
+		`SELECT id, COALESCE(card_id, ''), COALESCE(request_id, ''), COALESCE(bid_id, ''), customer_id, engineer_id, amount, status, COALESCE(delivery_notes, ''), COALESCE(dispute_reason, ''), created_at, updated_at
+		 FROM orders WHERE bid_id = $1`,
+		bidID,
+	))
+}
+
+func (s *PostgresStore) GetOrderByCardAndCustomer(cardID, customerID string) (domain.Order, error) {
+	return s.scanOrder(s.runner().QueryRow(
+		`SELECT id, COALESCE(card_id, ''), COALESCE(request_id, ''), COALESCE(bid_id, ''), customer_id, engineer_id, amount, status, COALESCE(delivery_notes, ''), COALESCE(dispute_reason, ''), created_at, updated_at
+		 FROM orders WHERE card_id = $1 AND customer_id = $2 ORDER BY created_at DESC LIMIT 1`,
+		cardID, customerID,
+	))
+}
+
+func (s *PostgresStore) UpdateOrder(order domain.Order) (domain.Order, error) {
+	order.LastStatusTime = time.Now().UTC()
+	_, err := s.runner().Exec(
+		`UPDATE orders SET status = $2, delivery_notes = $3, dispute_reason = $4, updated_at = $5 WHERE id = $1`,
+		order.ID, string(order.Status), order.DeliveryNotes, order.DisputeReason, order.LastStatusTime,
+	)
+	if err != nil {
+		return domain.Order{}, err
+	}
+	return s.GetOrder(order.ID)
+}
+
+func (s *PostgresStore) CreateTransaction(tx domain.Transaction) (domain.Transaction, error) {
+	tx.ID = uuid.NewString()
+	tx.CreatedAt = time.Now().UTC()
+	_, err := s.runner().Exec(
+		`INSERT INTO transactions (id, user_id, order_id, type, amount, external_id, created_at)
+		 VALUES ($1, $2, NULLIF($3, ''), $4, $5, NULLIF($6, ''), $7)`,
+		tx.ID, tx.UserID, tx.OrderID, string(tx.Type), tx.Amount, tx.ExternalID, tx.CreatedAt,
+	)
+	if err != nil {
+		return domain.Transaction{}, err
+	}
+	return tx, nil
+}
+
+func (s *PostgresStore) GetBalance(userID string) (int64, error) {
+	var balance sql.NullInt64
+	err := s.runner().QueryRow(
+		`SELECT COALESCE(SUM(CASE
+			WHEN type IN ('deposit', 'release', 'refund', 'partial_refund') THEN amount
+			WHEN type = 'hold' THEN -amount
+			ELSE 0
+		END), 0) AS balance
+		FROM transactions WHERE user_id = $1`,
+		userID,
+	).Scan(&balance)
+	if err != nil {
+		return 0, err
+	}
+	return balance.Int64, nil
+}
+
+func (s *PostgresStore) CreatePayment(payment domain.Payment) (domain.Payment, error) {
+	payment.ID = uuid.NewString()
+	payment.CreatedAt = time.Now().UTC()
+	_, err := s.runner().Exec(
+		`INSERT INTO payments (id, user_id, external_id, amount, status, provider, redirect_url, callback_data, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9)`,
+		payment.ID, payment.UserID, payment.ExternalID, payment.Amount, payment.Status, payment.Provider, payment.RedirectURL, payment.CallbackData, payment.CreatedAt,
+	)
+	if err != nil {
+		return domain.Payment{}, err
+	}
+	return payment, nil
+}
+
+func (s *PostgresStore) GetPaymentByExternalID(externalID string) (domain.Payment, error) {
+	var payment domain.Payment
+	err := s.runner().QueryRow(
+		`SELECT id, user_id, external_id, amount, status, provider, redirect_url, COALESCE(callback_data, ''), created_at FROM payments WHERE external_id = $1`,
+		externalID,
+	).Scan(&payment.ID, &payment.UserID, &payment.ExternalID, &payment.Amount, &payment.Status, &payment.Provider, &payment.RedirectURL, &payment.CallbackData, &payment.CreatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Payment{}, ErrNotFound
+		}
+		return domain.Payment{}, err
+	}
+	return payment, nil
+}
+
+func (s *PostgresStore) MarkPaymentSucceeded(externalID string) (domain.Payment, error) {
+	_, err := s.runner().Exec(
+		`UPDATE payments SET status = 'succeeded', updated_at = NOW() WHERE external_id = $1`,
+		externalID,
+	)
+	if err != nil {
+		return domain.Payment{}, err
+	}
+	return s.GetPaymentByExternalID(externalID)
+}
+
+func (s *PostgresStore) CreateNotification(userID, eventType, message string) error {
+	_, err := s.runner().Exec(
+		`INSERT INTO notifications (id, user_id, type, message, is_read, created_at) VALUES ($1, $2, $3, $4, FALSE, $5)`,
+		uuid.NewString(), userID, eventType, message, time.Now().UTC(),
+	)
+	return err
+}
+
+func (s *PostgresStore) scanUser(row *sql.Row) (domain.User, error) {
+	var user domain.User
+	var role string
+	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &role, &user.CreatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.User{}, ErrNotFound
+		}
+		return domain.User{}, err
+	}
+	user.Role = domain.Role(role)
+	return user, nil
+}
+
+func (s *PostgresStore) scanOrder(row *sql.Row) (domain.Order, error) {
+	var order domain.Order
+	var status string
+	err := row.Scan(
+		&order.ID,
+		&order.CardID,
+		&order.RequestID,
+		&order.BidID,
+		&order.CustomerID,
+		&order.EngineerID,
+		&order.Amount,
+		&status,
+		&order.DeliveryNotes,
+		&order.DisputeReason,
+		&order.CreatedAt,
+		&order.LastStatusTime,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Order{}, ErrNotFound
+		}
+		return domain.Order{}, err
+	}
+	order.Status = domain.OrderStatus(status)
+	return order, nil
+}

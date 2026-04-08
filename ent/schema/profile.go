@@ -15,6 +15,8 @@ func (Profile) Fields() []ent.Field {
 		field.String("display_name"),
 		field.Text("bio").Optional(),
 		field.Float("rating").Default(0),
+		field.Time("created_at"),
+		field.Time("updated_at"),
 	}
 }
 

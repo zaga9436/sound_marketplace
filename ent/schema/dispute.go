@@ -12,8 +12,12 @@ type Dispute struct {
 
 func (Dispute) Fields() []ent.Field {
 	return []ent.Field{
+		field.String("opened_by"),
 		field.Text("reason"),
 		field.String("status").Default("open"),
+		field.Text("resolution").Default(""),
+		field.Time("created_at"),
+		field.Time("resolved_at").Optional().Nillable(),
 	}
 }
 

@@ -13,6 +13,8 @@ import (
 type Config struct {
 	AppEnv                string
 	AppPort               string
+	AutoApplyMigrations   bool
+	MigrationsDir         string
 	PostgresHost          string
 	PostgresPort          string
 	PostgresDB            string
@@ -42,6 +44,21 @@ type Config struct {
 	PreviewDurationSecond int
 }
 
+func (c *Config) PostgresDSN() string {
+	return fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s sslmode=%s client_encoding=UTF8",
+		c.PostgresHost,
+		c.PostgresPort,
+		c.PostgresDB,
+		c.PostgresUser,
+		c.PostgresPassword,
+		c.PostgresSSLMode,
+	)
+}
+
+func (c *Config) RedisAddr() string {
+	return fmt.Sprintf("%s:%s", c.RedisHost, c.RedisPort)
+}
+
 func Load() (*Config, error) {
 	_ = godotenv.Load()
 
@@ -60,24 +77,25 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		AppEnv:           getWithDefault("APP_ENV", "development"),
-		AppPort:          required["APP_PORT"],
-		PostgresHost:     required["POSTGRES_HOST"],
-		PostgresPort:     required["POSTGRES_PORT"],
-		PostgresDB:       required["POSTGRES_DB"],
-		PostgresUser:     required["POSTGRES_USER"],
-		PostgresPassword: required["POSTGRES_PASSWORD"],
-		PostgresSSLMode:  getWithDefault("POSTGRES_SSLMODE", "disable"),
-		RedisHost:        required["REDIS_HOST"],
-		RedisPort:        required["REDIS_PORT"],
-		RedisPassword:    os.Getenv("REDIS_PASSWORD"),
-		JWTSecret:        required["JWT_SECRET"],
-		S3Endpoint:       required["S3_ENDPOINT"],
-		S3Region:         required["S3_REGION"],
-		S3Bucket:         required["S3_BUCKET"],
-		S3AccessKey:      required["S3_ACCESS_KEY"],
-		S3SecretKey:      required["S3_SECRET_KEY"],
-		YooKassaShopID:   required["YOOKASSA_SHOP_ID"],
+		AppEnv:              getWithDefault("APP_ENV", "development"),
+		AppPort:             required["APP_PORT"],
+		MigrationsDir:       getWithDefault("MIGRATIONS_DIR", "migrations"),
+		PostgresHost:        required["POSTGRES_HOST"],
+		PostgresPort:        required["POSTGRES_PORT"],
+		PostgresDB:          required["POSTGRES_DB"],
+		PostgresUser:        required["POSTGRES_USER"],
+		PostgresPassword:    required["POSTGRES_PASSWORD"],
+		PostgresSSLMode:     getWithDefault("POSTGRES_SSLMODE", "disable"),
+		RedisHost:           required["REDIS_HOST"],
+		RedisPort:           required["REDIS_PORT"],
+		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
+		JWTSecret:           required["JWT_SECRET"],
+		S3Endpoint:          required["S3_ENDPOINT"],
+		S3Region:            required["S3_REGION"],
+		S3Bucket:            required["S3_BUCKET"],
+		S3AccessKey:         required["S3_ACCESS_KEY"],
+		S3SecretKey:         required["S3_SECRET_KEY"],
+		YooKassaShopID:      required["YOOKASSA_SHOP_ID"],
 		YooKassaSecretKey: required["YOOKASSA_SECRET_KEY"],
 		YooKassaReturnURL: required["YOOKASSA_RETURN_URL"],
 		AllowedAudioFormats: parseCSV(required["ALLOWED_AUDIO_FORMATS"]),
@@ -104,6 +122,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.S3UseSSL, err = strconv.ParseBool(required["S3_USE_SSL"]); err != nil {
 		return nil, fmt.Errorf("parse S3_USE_SSL: %w", err)
+	}
+	if cfg.AutoApplyMigrations, err = strconv.ParseBool(getWithDefault("AUTO_APPLY_MIGRATIONS", defaultAutoApplyMigrations(cfg.AppEnv))); err != nil {
+		return nil, fmt.Errorf("parse AUTO_APPLY_MIGRATIONS: %w", err)
 	}
 
 	return cfg, nil
@@ -139,4 +160,11 @@ func parseCSV(value string) []string {
 		}
 	}
 	return result
+}
+
+func defaultAutoApplyMigrations(appEnv string) string {
+	if strings.EqualFold(appEnv, "production") {
+		return "false"
+	}
+	return "true"
 }

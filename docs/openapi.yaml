@@ -1,14 +1,13 @@
 openapi: 3.0.3
 info:
   title: SoundMarket Backend API
-  version: 0.1.0
-  description: Initial backend skeleton for SoundMarket.
+  version: 0.2.0
 servers:
   - url: http://localhost:8080/api/v1
 paths:
   /auth/register:
     post:
-      summary: Register user
+      summary: Register customer or engineer
       requestBody:
         required: true
         content:
@@ -18,6 +17,10 @@ paths:
       responses:
         '201':
           description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
   /auth/login:
     post:
       summary: Login user
@@ -26,18 +29,59 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AuthRequest'
+              $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
           description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
   /auth/me:
     get:
-      summary: Current user
+      summary: Get current user
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Current user profile
+          description: Current user
+  /users/me:
+    get:
+      summary: Alias for current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user
+  /profiles/me:
+    get:
+      summary: Get current profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current profile
+    put:
+      summary: Update current profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdateRequest'
+      responses:
+        '200':
+          description: Updated profile
+  /profiles/{id}:
+    get:
+      summary: Get public profile
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Public profile
   /cards:
     get:
       summary: List cards
@@ -53,7 +97,7 @@ paths:
             type: string
       responses:
         '200':
-          description: Cards list
+          description: Cards
     post:
       summary: Create card
       security:
@@ -69,12 +113,12 @@ paths:
           description: Card created
   /cards/{id}:
     get:
-      summary: Get card
+      summary: Get card by id
       parameters:
         - $ref: '#/components/parameters/ID'
       responses:
         '200':
-          description: Card details
+          description: Card
     put:
       summary: Update card
       security:
@@ -90,29 +134,6 @@ paths:
       responses:
         '200':
           description: Card updated
-  /profiles/me:
-    get:
-      summary: Get own profile
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Own profile
-    put:
-      summary: Update own profile
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Updated profile
-  /profiles/{id}:
-    get:
-      summary: Public profile
-      parameters:
-        - $ref: '#/components/parameters/ID'
-      responses:
-        '200':
-          description: Public profile
   /requests/{id}/bids:
     get:
       summary: List bids for request
@@ -122,7 +143,7 @@ paths:
         - $ref: '#/components/parameters/ID'
       responses:
         '200':
-          description: Bids list
+          description: Bids
     post:
       summary: Create bid for request
       security:
@@ -140,17 +161,29 @@ paths:
           description: Bid created
   /orders/from-offer:
     post:
-      summary: Create order from offer
+      summary: Create order directly from offer
       security:
         - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OfferOrderRequest'
       responses:
         '201':
           description: Order created
   /orders/from-bid:
     post:
-      summary: Create order from bid
+      summary: Create order from selected bid
       security:
         - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BidOrderRequest'
       responses:
         '201':
           description: Order created
@@ -163,7 +196,7 @@ paths:
         - $ref: '#/components/parameters/ID'
       responses:
         '200':
-          description: Order details
+          description: Order
   /orders/{id}/status:
     patch:
       summary: Update order status
@@ -171,17 +204,41 @@ paths:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderStatusRequest'
       responses:
         '200':
           description: Order updated
   /payments/deposits:
     post:
-      summary: Create deposit payment
+      summary: Create mock deposit payment
       security:
         - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepositRequest'
       responses:
         '201':
           description: Deposit created
+  /payments/webhook:
+    post:
+      summary: Mark mock YooKassa payment as succeeded and create internal deposit transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentWebhookRequest'
+      responses:
+        '200':
+          description: Payment processed
   /payments/balance:
     get:
       summary: Get internal balance
@@ -189,23 +246,17 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: User balance
-  /payments/webhook:
-    post:
-      summary: Mock YooKassa webhook
-      responses:
-        '200':
-          description: Payment processed
+          description: Balance
   /ws/orders/{id}:
     get:
-      summary: Get websocket connection meta for order chat
+      summary: Get placeholder websocket metadata for order chat
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/ID'
       responses:
         '200':
-          description: Chat connection payload
+          description: Chat bootstrap payload
 components:
   securitySchemes:
     bearerAuth:
@@ -226,13 +277,62 @@ components:
       properties:
         email:
           type: string
+          format: email
         password:
           type: string
         role:
           type: string
-          enum: [customer, engineer, admin]
+          enum: [customer, engineer]
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        profile:
+          $ref: '#/components/schemas/Profile'
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+    Profile:
+      type: object
+      properties:
+        user_id:
+          type: string
+        display_name:
+          type: string
+        bio:
+          type: string
+        rating:
+          type: number
+          format: double
+    ProfileUpdateRequest:
+      type: object
+      required: [display_name, bio]
+      properties:
+        display_name:
+          type: string
+        bio:
+          type: string
     CardRequest:
       type: object
+      required: [card_type, kind, title, description, price]
       properties:
         card_type:
           type: string
@@ -251,11 +351,46 @@ components:
           type: array
           items:
             type: string
+        is_published:
+          type: boolean
     BidRequest:
       type: object
+      required: [price, message]
       properties:
         price:
           type: integer
           format: int64
         message:
+          type: string
+    OfferOrderRequest:
+      type: object
+      required: [card_id]
+      properties:
+        card_id:
+          type: string
+    BidOrderRequest:
+      type: object
+      required: [bid_id]
+      properties:
+        bid_id:
+          type: string
+    OrderStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [created, on_hold, in_progress, review, completed, dispute, cancelled]
+    DepositRequest:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          type: integer
+          format: int64
+    PaymentWebhookRequest:
+      type: object
+      required: [external_id]
+      properties:
+        external_id:
           type: string

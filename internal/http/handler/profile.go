@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	httprequest "github.com/soundmarket/backend/internal/http/request"
 	"github.com/soundmarket/backend/internal/http/middleware"
 	"github.com/soundmarket/backend/internal/http/response"
 	"github.com/soundmarket/backend/internal/service"
@@ -45,7 +45,7 @@ func (h *ProfileHandler) Public(w http.ResponseWriter, r *http.Request) {
 func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
 	var req updateProfileRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httprequest.DecodeJSON(r, &req); err != nil {
 		response.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}

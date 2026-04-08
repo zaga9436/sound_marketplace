@@ -12,6 +12,7 @@ import (
 
 type Dependencies struct {
 	Config         *config.Config
+	Store          repository.Store
 	AuthManager    *auth.JWTManager
 	StorageAdapter storage.Adapter
 	PaymentAdapter payments.Adapter
@@ -32,14 +33,13 @@ type Registry struct {
 }
 
 func NewRegistry(deps Dependencies) *Registry {
-	store := repository.NewMemoryStore()
 	return &Registry{
-		Auth:        NewAuthService(store, deps.AuthManager),
-		Profile:     NewProfileService(store),
-		Card:        NewCardService(store, deps.Notifier),
-		Bid:         NewBidService(store, deps.Notifier),
-		Order:       NewOrderService(store, deps.Notifier),
-		Payment:     NewPaymentService(store, deps.PaymentAdapter, deps.Notifier),
+		Auth:        NewAuthService(deps.Store, deps.AuthManager),
+		Profile:     NewProfileService(deps.Store),
+		Card:        NewCardService(deps.Store, deps.Notifier),
+		Bid:         NewBidService(deps.Store, deps.Notifier),
+		Order:       NewOrderService(deps.Store, deps.Notifier),
+		Payment:     NewPaymentService(deps.Store, deps.PaymentAdapter, deps.Notifier),
 		Health:      NewHealthService(deps.Config),
 		Realtime:    NewRealtimeService(deps.WorkerQueue, deps.StorageAdapter),
 		AuthManager: deps.AuthManager,

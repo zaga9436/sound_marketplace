@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
+	httprequest "github.com/soundmarket/backend/internal/http/request"
 	"github.com/soundmarket/backend/internal/http/middleware"
 	"github.com/soundmarket/backend/internal/http/response"
 	"github.com/soundmarket/backend/internal/service"
@@ -18,9 +18,7 @@ type depositRequest struct {
 }
 
 type webhookRequest struct {
-	UserID     string `json:"user_id"`
 	ExternalID string `json:"external_id"`
-	Amount     int64  `json:"amount"`
 }
 
 func NewPaymentHandler(service *service.PaymentService) *PaymentHandler {
@@ -30,7 +28,7 @@ func NewPaymentHandler(service *service.PaymentService) *PaymentHandler {
 func (h *PaymentHandler) CreateDeposit(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
 	var req depositRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httprequest.DecodeJSON(r, &req); err != nil {
 		response.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}
@@ -44,14 +42,24 @@ func (h *PaymentHandler) CreateDeposit(w http.ResponseWriter, r *http.Request) {
 
 func (h *PaymentHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	var req webhookRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httprequest.DecodeJSON(r, &req); err != nil {
 		response.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}
-	response.JSON(w, http.StatusOK, h.service.ProcessWebhook(req.UserID, req.ExternalID, req.Amount))
+	tx, err := h.service.ProcessWebhook(req.ExternalID)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	response.JSON(w, http.StatusOK, tx)
 }
 
 func (h *PaymentHandler) Balance(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
-	response.JSON(w, http.StatusOK, map[string]int64{"balance": h.service.Balance(user.ID)})
+	balance, err := h.service.Balance(user.ID)
+	if err != nil {
+		response.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.JSON(w, http.StatusOK, map[string]int64{"balance": balance})
 }

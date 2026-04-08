@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/soundmarket/backend/internal/domain"
+	httprequest "github.com/soundmarket/backend/internal/http/request"
 	"github.com/soundmarket/backend/internal/http/middleware"
 	"github.com/soundmarket/backend/internal/http/response"
 	"github.com/soundmarket/backend/internal/service"
@@ -34,7 +34,7 @@ func NewOrderHandler(service *service.OrderService) *OrderHandler {
 func (h *OrderHandler) CreateFromOffer(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
 	var req createOfferOrderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httprequest.DecodeJSON(r, &req); err != nil {
 		response.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}
@@ -49,7 +49,7 @@ func (h *OrderHandler) CreateFromOffer(w http.ResponseWriter, r *http.Request) {
 func (h *OrderHandler) CreateFromBid(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
 	var req createBidOrderRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httprequest.DecodeJSON(r, &req); err != nil {
 		response.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}
@@ -74,7 +74,7 @@ func (h *OrderHandler) Get(w http.ResponseWriter, r *http.Request) {
 func (h *OrderHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
 	var req updateStatusRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httprequest.DecodeJSON(r, &req); err != nil {
 		response.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}

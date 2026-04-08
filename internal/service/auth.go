@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -11,7 +12,7 @@ import (
 )
 
 type AuthService struct {
-	store *repository.MemoryStore
+	store repository.Store
 	jwt   *auth.JWTManager
 }
 
@@ -21,11 +22,22 @@ type AuthResult struct {
 	Profile domain.Profile `json:"profile"`
 }
 
-func NewAuthService(store *repository.MemoryStore, jwt *auth.JWTManager) *AuthService {
+func NewAuthService(store repository.Store, jwt *auth.JWTManager) *AuthService {
 	return &AuthService{store: store, jwt: jwt}
 }
 
 func (s *AuthService) Register(email, password string, role domain.Role) (*AuthResult, error) {
+	email = strings.TrimSpace(strings.ToLower(email))
+	if email == "" {
+		return nil, fmt.Errorf("email is required")
+	}
+	if len(password) < 6 {
+		return nil, fmt.Errorf("password must be at least 6 characters")
+	}
+	if role != domain.RoleCustomer && role != domain.RoleEngineer {
+		return nil, fmt.Errorf("only customer or engineer can self-register")
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -42,6 +54,10 @@ func (s *AuthService) Register(email, password string, role domain.Role) (*AuthR
 }
 
 func (s *AuthService) Login(email, password string) (*AuthResult, error) {
+	email = strings.TrimSpace(strings.ToLower(email))
+	if email == "" || strings.TrimSpace(password) == "" {
+		return nil, fmt.Errorf("email and password are required")
+	}
 	user, err := s.store.FindUserByEmail(email)
 	if err != nil {
 		return nil, fmt.Errorf("invalid credentials")

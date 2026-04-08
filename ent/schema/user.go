@@ -15,6 +15,7 @@ func (User) Fields() []ent.Field {
 		field.String("email").Unique(),
 		field.String("password_hash"),
 		field.Enum("role").Values("customer", "engineer", "admin"),
+		field.Time("created_at"),
 	}
 }
 

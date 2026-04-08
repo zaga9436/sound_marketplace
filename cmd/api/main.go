@@ -17,6 +17,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("app init failed: %v", err)
 	}
+	defer application.DB.Close()
+	defer application.Redis.Close()
 
 	server := &http.Server{
 		Addr:              ":" + application.Config.AppPort,

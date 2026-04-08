@@ -16,6 +16,7 @@ func (Notification) Fields() []ent.Field {
 		field.String("type"),
 		field.Text("message"),
 		field.Bool("is_read").Default(false),
+		field.Time("created_at"),
 	}
 }
 

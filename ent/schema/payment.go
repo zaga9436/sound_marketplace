@@ -18,6 +18,8 @@ func (Payment) Fields() []ent.Field {
 		field.String("status"),
 		field.String("redirect_url"),
 		field.Text("callback_data").Optional(),
+		field.Time("created_at"),
+		field.Time("updated_at"),
 	}
 }
 

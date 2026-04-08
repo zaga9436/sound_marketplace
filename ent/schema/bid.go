@@ -14,6 +14,7 @@ func (Bid) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int64("price"),
 		field.Text("message"),
+		field.Time("created_at"),
 	}
 }
 

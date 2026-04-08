@@ -3,6 +3,7 @@ package schema
 import (
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
+	"entgo.io/ent/schema/field"
 )
 
 type ChatRoom struct {
@@ -10,7 +11,9 @@ type ChatRoom struct {
 }
 
 func (ChatRoom) Fields() []ent.Field {
-	return nil
+	return []ent.Field{
+		field.Time("created_at"),
+	}
 }
 
 func (ChatRoom) Edges() []ent.Edge {

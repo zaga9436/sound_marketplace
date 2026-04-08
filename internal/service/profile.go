@@ -6,10 +6,10 @@ import (
 )
 
 type ProfileService struct {
-	store *repository.MemoryStore
+	store repository.Store
 }
 
-func NewProfileService(store *repository.MemoryStore) *ProfileService {
+func NewProfileService(store repository.Store) *ProfileService {
 	return &ProfileService{store: store}
 }
 

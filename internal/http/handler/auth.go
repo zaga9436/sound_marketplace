@@ -1,10 +1,10 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/soundmarket/backend/internal/domain"
+	httprequest "github.com/soundmarket/backend/internal/http/request"
 	"github.com/soundmarket/backend/internal/http/middleware"
 	"github.com/soundmarket/backend/internal/http/response"
 	"github.com/soundmarket/backend/internal/service"
@@ -26,7 +26,7 @@ func NewAuthHandler(service *service.AuthService) *AuthHandler {
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req authRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httprequest.DecodeJSON(r, &req); err != nil {
 		response.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}
@@ -40,7 +40,7 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req authRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httprequest.DecodeJSON(r, &req); err != nil {
 		response.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}

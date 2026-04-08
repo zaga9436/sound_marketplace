@@ -12,8 +12,8 @@ FROM alpine:3.20
 
 WORKDIR /app
 COPY --from=builder /soundmarket /usr/local/bin/soundmarket
+COPY --from=builder /app/migrations /app/migrations
 
 EXPOSE 8080
 
 CMD ["soundmarket"]
-

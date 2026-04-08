@@ -1,10 +1,11 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/soundmarket/backend/internal/domain"
+	httprequest "github.com/soundmarket/backend/internal/http/request"
 	"github.com/soundmarket/backend/internal/http/middleware"
 	"github.com/soundmarket/backend/internal/http/response"
 	"github.com/soundmarket/backend/internal/service"
@@ -26,7 +27,7 @@ func NewBidHandler(service *service.BidService) *BidHandler {
 func (h *BidHandler) Create(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
 	var req bidRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := httprequest.DecodeJSON(r, &req); err != nil {
 		response.Error(w, http.StatusBadRequest, "invalid json")
 		return
 	}
@@ -39,5 +40,14 @@ func (h *BidHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *BidHandler) List(w http.ResponseWriter, r *http.Request) {
-	response.JSON(w, http.StatusOK, h.service.List(chi.URLParam(r, "id")))
+	user := middleware.CurrentUser(r)
+	bids, err := h.service.List(user, chi.URLParam(r, "id"))
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if bids == nil {
+		bids = []domain.Bid{}
+	}
+	response.JSON(w, http.StatusOK, bids)
 }

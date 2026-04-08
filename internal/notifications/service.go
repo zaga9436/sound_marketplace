@@ -1,36 +1,19 @@
 package notifications
 
-import "sync"
-
-type Event struct {
-	UserID  string `json:"user_id"`
-	Type    string `json:"type"`
-	Message string `json:"message"`
-}
+import "github.com/soundmarket/backend/internal/repository"
 
 type Service interface {
 	Publish(userID, eventType, message string)
-	List(userID string) []Event
 }
 
-type InMemoryService struct {
-	mu     sync.RWMutex
-	events map[string][]Event
+type RepositoryBackedService struct {
+	store repository.Store
 }
 
-func NewInMemoryService() *InMemoryService {
-	return &InMemoryService{events: map[string][]Event{}}
+func NewRepositoryBackedService(store repository.Store) *RepositoryBackedService {
+	return &RepositoryBackedService{store: store}
 }
 
-func (s *InMemoryService) Publish(userID, eventType, message string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.events[userID] = append(s.events[userID], Event{UserID: userID, Type: eventType, Message: message})
+func (s *RepositoryBackedService) Publish(userID, eventType, message string) {
+	_ = s.store.CreateNotification(userID, eventType, message)
 }
-
-func (s *InMemoryService) List(userID string) []Event {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return append([]Event(nil), s.events[userID]...)
-}
-
