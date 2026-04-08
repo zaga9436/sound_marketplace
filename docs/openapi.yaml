@@ -213,6 +213,47 @@ paths:
       responses:
         '200':
           description: Order updated
+  /orders/{id}/dispute:
+    get:
+      summary: Get dispute for order
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Dispute
+    post:
+      summary: Open dispute for order
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenDisputeRequest'
+      responses:
+        '201':
+          description: Dispute opened
+  /orders/{id}/dispute/close:
+    post:
+      summary: Close dispute for order
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloseDisputeRequest'
+      responses:
+        '200':
+          description: Dispute closed
   /payments/deposits:
     post:
       summary: Create mock deposit payment
@@ -381,6 +422,22 @@ components:
         status:
           type: string
           enum: [created, on_hold, in_progress, review, completed, dispute, cancelled]
+    OpenDisputeRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+        message:
+          type: string
+    CloseDisputeRequest:
+      type: object
+      required: [resolution]
+      properties:
+        resolution:
+          type: string
+          enum: [complete_order, cancel_order]
+        message:
+          type: string
     DepositRequest:
       type: object
       required: [amount]

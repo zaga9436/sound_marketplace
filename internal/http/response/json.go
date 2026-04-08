@@ -29,6 +29,8 @@ func FromError(w http.ResponseWriter, err error) {
 		Error(w, http.StatusForbidden, apierr.Message(err))
 	case errors.Is(err, apierr.ErrNotFound), errors.Is(err, repository.ErrNotFound):
 		Error(w, http.StatusNotFound, apierr.Message(err))
+	case errors.Is(err, apierr.ErrConflict):
+		Error(w, http.StatusConflict, apierr.Message(err))
 	case errors.Is(err, apierr.ErrBadRequest):
 		Error(w, http.StatusBadRequest, apierr.Message(err))
 	default:

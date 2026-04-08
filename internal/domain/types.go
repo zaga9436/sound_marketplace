@@ -120,3 +120,28 @@ type Payment struct {
 	CallbackData string    `json:"callback_data,omitempty"`
 	CreatedAt    time.Time `json:"created_at"`
 }
+
+type DisputeStatus string
+
+const (
+	DisputeStatusOpen   DisputeStatus = "open"
+	DisputeStatusClosed DisputeStatus = "closed"
+)
+
+type DisputeResolution string
+
+const (
+	DisputeResolutionCompleteOrder DisputeResolution = "complete_order"
+	DisputeResolutionCancelOrder   DisputeResolution = "cancel_order"
+)
+
+type Dispute struct {
+	ID             string             `json:"id"`
+	OrderID        string             `json:"order_id"`
+	OpenedByUserID string             `json:"opened_by_user_id"`
+	Reason         string             `json:"reason"`
+	Status         DisputeStatus      `json:"status"`
+	Resolution     DisputeResolution  `json:"resolution,omitempty"`
+	CreatedAt      time.Time          `json:"created_at"`
+	ClosedAt       *time.Time         `json:"closed_at,omitempty"`
+}

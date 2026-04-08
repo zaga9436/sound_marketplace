@@ -183,6 +183,12 @@ func (s *OrderService) UpdateStatus(actor domain.User, orderID string, next doma
 		if actor.Role != domain.RoleAdmin && actor.ID != order.CustomerID && actor.ID != order.EngineerID {
 			return apierr.Forbidden("forbidden")
 		}
+		if next == domain.OrderStatusDispute {
+			return apierr.BadRequest("use dispute endpoint to open dispute")
+		}
+		if order.Status == domain.OrderStatusDispute {
+			return apierr.BadRequest("use dispute close endpoint to resolve disputed order")
+		}
 		if !isStatusTransitionAllowed(order.Status, next) {
 			return apierr.BadRequest("invalid status transition")
 		}

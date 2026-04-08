@@ -467,6 +467,52 @@ func (s *PostgresStore) MarkPaymentSucceeded(externalID string) (domain.Payment,
 	return s.GetPaymentByExternalID(externalID)
 }
 
+func (s *PostgresStore) CreateDispute(dispute domain.Dispute) (domain.Dispute, error) {
+	dispute.ID = uuid.NewString()
+	dispute.CreatedAt = time.Now().UTC()
+	_, err := s.runner().Exec(
+		`INSERT INTO disputes (id, order_id, opened_by, reason, status, resolution, created_at, resolved_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)`,
+		dispute.ID, dispute.OrderID, dispute.OpenedByUserID, dispute.Reason, string(dispute.Status), string(dispute.Resolution), dispute.CreatedAt,
+	)
+	if err != nil {
+		return domain.Dispute{}, err
+	}
+	return dispute, nil
+}
+
+func (s *PostgresStore) GetDisputeByOrderID(orderID string) (domain.Dispute, error) {
+	return s.scanDispute(s.runner().QueryRow(
+		`SELECT id, order_id, opened_by, reason, status, resolution, created_at, resolved_at
+		 FROM disputes WHERE order_id = $1 ORDER BY created_at DESC LIMIT 1`,
+		orderID,
+	))
+}
+
+func (s *PostgresStore) GetOpenDisputeByOrderID(orderID string) (domain.Dispute, error) {
+	return s.scanDispute(s.runner().QueryRow(
+		`SELECT id, order_id, opened_by, reason, status, resolution, created_at, resolved_at
+		 FROM disputes WHERE order_id = $1 AND status = 'open' ORDER BY created_at DESC LIMIT 1`,
+		orderID,
+	))
+}
+
+func (s *PostgresStore) CloseDispute(disputeID string, resolution domain.DisputeResolution) (domain.Dispute, error) {
+	now := time.Now().UTC()
+	_, err := s.runner().Exec(
+		`UPDATE disputes SET status = 'closed', resolution = $2, resolved_at = $3 WHERE id = $1`,
+		disputeID, string(resolution), now,
+	)
+	if err != nil {
+		return domain.Dispute{}, err
+	}
+	return s.scanDispute(s.runner().QueryRow(
+		`SELECT id, order_id, opened_by, reason, status, resolution, created_at, resolved_at
+		 FROM disputes WHERE id = $1`,
+		disputeID,
+	))
+}
+
 func (s *PostgresStore) CreateNotification(userID, eventType, message string) error {
 	_, err := s.runner().Exec(
 		`INSERT INTO notifications (id, user_id, type, message, is_read, created_at) VALUES ($1, $2, $3, $4, FALSE, $5)`,
@@ -514,6 +560,36 @@ func (s *PostgresStore) scanOrder(row *sql.Row) (domain.Order, error) {
 	}
 	order.Status = domain.OrderStatus(status)
 	return order, nil
+}
+
+func (s *PostgresStore) scanDispute(row *sql.Row) (domain.Dispute, error) {
+	var dispute domain.Dispute
+	var status string
+	var resolution string
+	var closedAt sql.NullTime
+	err := row.Scan(
+		&dispute.ID,
+		&dispute.OrderID,
+		&dispute.OpenedByUserID,
+		&dispute.Reason,
+		&status,
+		&resolution,
+		&dispute.CreatedAt,
+		&closedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Dispute{}, ErrNotFound
+		}
+		return domain.Dispute{}, err
+	}
+	dispute.Status = domain.DisputeStatus(status)
+	dispute.Resolution = domain.DisputeResolution(resolution)
+	if closedAt.Valid {
+		t := closedAt.Time
+		dispute.ClosedAt = &t
+	}
+	return dispute, nil
 }
 
 func (s *PostgresStore) listOrders(query string, args ...interface{}) ([]domain.Order, error) {

@@ -38,5 +38,10 @@ type Store interface {
 	GetPaymentByExternalID(externalID string) (domain.Payment, error)
 	MarkPaymentSucceeded(externalID string) (domain.Payment, error)
 
+	CreateDispute(dispute domain.Dispute) (domain.Dispute, error)
+	GetDisputeByOrderID(orderID string) (domain.Dispute, error)
+	GetOpenDisputeByOrderID(orderID string) (domain.Dispute, error)
+	CloseDispute(disputeID string, resolution domain.DisputeResolution) (domain.Dispute, error)
+
 	CreateNotification(userID, eventType, message string) error
 }

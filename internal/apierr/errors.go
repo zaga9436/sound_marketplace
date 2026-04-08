@@ -11,6 +11,7 @@ var (
 	ErrUnauthorized = errors.New("unauthorized")
 	ErrForbidden   = errors.New("forbidden")
 	ErrNotFound    = errors.New("not found")
+	ErrConflict    = errors.New("conflict")
 )
 
 func BadRequest(message string) error {
@@ -29,6 +30,10 @@ func NotFound(message string) error {
 	return fmt.Errorf("%w: %s", ErrNotFound, message)
 }
 
+func Conflict(message string) error {
+	return fmt.Errorf("%w: %s", ErrConflict, message)
+}
+
 func Message(err error) string {
 	if err == nil {
 		return ""
@@ -39,6 +44,7 @@ func Message(err error) string {
 		"unauthorized: ",
 		"forbidden: ",
 		"not found: ",
+		"conflict: ",
 	}
 	for _, prefix := range prefixes {
 		if strings.HasPrefix(message, prefix) {

@@ -1,7 +1,6 @@
 package service
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/soundmarket/backend/internal/apierr"

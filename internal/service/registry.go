@@ -26,6 +26,7 @@ type Registry struct {
 	Card        *CardService
 	Bid         *BidService
 	Order       *OrderService
+	Dispute     *DisputeService
 	Payment     *PaymentService
 	Health      *HealthService
 	Realtime    *RealtimeService
@@ -39,6 +40,7 @@ func NewRegistry(deps Dependencies) *Registry {
 		Card:        NewCardService(deps.Store, deps.Notifier),
 		Bid:         NewBidService(deps.Store, deps.Notifier),
 		Order:       NewOrderService(deps.Store, deps.Notifier),
+		Dispute:     NewDisputeService(deps.Store, deps.Notifier),
 		Payment:     NewPaymentService(deps.Store, deps.PaymentAdapter, deps.Notifier),
 		Health:      NewHealthService(deps.Config),
 		Realtime:    NewRealtimeService(deps.WorkerQueue, deps.StorageAdapter),
