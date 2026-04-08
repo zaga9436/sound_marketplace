@@ -1,0 +1,261 @@
+openapi: 3.0.3
+info:
+  title: SoundMarket Backend API
+  version: 0.1.0
+  description: Initial backend skeleton for SoundMarket.
+servers:
+  - url: http://localhost:8080/api/v1
+paths:
+  /auth/register:
+    post:
+      summary: Register user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        '201':
+          description: Registered
+  /auth/login:
+    post:
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthRequest'
+      responses:
+        '200':
+          description: Logged in
+  /auth/me:
+    get:
+      summary: Current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+  /cards:
+    get:
+      summary: List cards
+      parameters:
+        - in: query
+          name: card_type
+          schema:
+            type: string
+            enum: [offer, request]
+        - in: query
+          name: q
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Cards list
+    post:
+      summary: Create card
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardRequest'
+      responses:
+        '201':
+          description: Card created
+  /cards/{id}:
+    get:
+      summary: Get card
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Card details
+    put:
+      summary: Update card
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardRequest'
+      responses:
+        '200':
+          description: Card updated
+  /profiles/me:
+    get:
+      summary: Get own profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Own profile
+    put:
+      summary: Update own profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Updated profile
+  /profiles/{id}:
+    get:
+      summary: Public profile
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Public profile
+  /requests/{id}/bids:
+    get:
+      summary: List bids for request
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Bids list
+    post:
+      summary: Create bid for request
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BidRequest'
+      responses:
+        '201':
+          description: Bid created
+  /orders/from-offer:
+    post:
+      summary: Create order from offer
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Order created
+  /orders/from-bid:
+    post:
+      summary: Create order from bid
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Order created
+  /orders/{id}:
+    get:
+      summary: Get order
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Order details
+  /orders/{id}/status:
+    patch:
+      summary: Update order status
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Order updated
+  /payments/deposits:
+    post:
+      summary: Create deposit payment
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: Deposit created
+  /payments/balance:
+    get:
+      summary: Get internal balance
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User balance
+  /payments/webhook:
+    post:
+      summary: Mock YooKassa webhook
+      responses:
+        '200':
+          description: Payment processed
+  /ws/orders/{id}:
+    get:
+      summary: Get websocket connection meta for order chat
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Chat connection payload
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ID:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+  schemas:
+    AuthRequest:
+      type: object
+      required: [email, password, role]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [customer, engineer, admin]
+    CardRequest:
+      type: object
+      properties:
+        card_type:
+          type: string
+          enum: [offer, request]
+        kind:
+          type: string
+          enum: [product, service]
+        title:
+          type: string
+        description:
+          type: string
+        price:
+          type: integer
+          format: int64
+        tags:
+          type: array
+          items:
+            type: string
+    BidRequest:
+      type: object
+      properties:
+        price:
+          type: integer
+          format: int64
+        message:
+          type: string
