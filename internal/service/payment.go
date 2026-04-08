@@ -1,8 +1,7 @@
 package service
 
 import (
-	"fmt"
-
+	"github.com/soundmarket/backend/internal/apierr"
 	"github.com/soundmarket/backend/internal/domain"
 	"github.com/soundmarket/backend/internal/notifications"
 	"github.com/soundmarket/backend/internal/payments"
@@ -21,7 +20,7 @@ func NewPaymentService(store repository.Store, adapter payments.Adapter, notifie
 
 func (s *PaymentService) CreateDeposit(user domain.User, amount int64) (domain.Payment, error) {
 	if amount <= 0 {
-		return domain.Payment{}, fmt.Errorf("amount must be positive")
+		return domain.Payment{}, apierr.BadRequest("amount must be positive")
 	}
 	result, err := s.adapter.CreatePayment(user.ID, amount)
 	if err != nil {
@@ -42,10 +41,10 @@ func (s *PaymentService) ProcessWebhook(externalID string) (domain.Transaction, 
 	err := s.store.WithTx(func(tx repository.Store) error {
 		payment, err := tx.GetPaymentByExternalID(externalID)
 		if err != nil {
-			return err
+			return apierr.NotFound("payment not found")
 		}
 		if payment.Status == "succeeded" {
-			return fmt.Errorf("payment already processed")
+			return apierr.BadRequest("payment already processed")
 		}
 		if _, err := tx.MarkPaymentSucceeded(externalID); err != nil {
 			return err
@@ -67,7 +66,7 @@ func (s *PaymentService) ProcessWebhook(externalID string) (domain.Transaction, 
 
 func (s *PaymentService) Refund(order domain.Order, amount int64) (domain.Transaction, error) {
 	if amount <= 0 || amount > order.Amount {
-		return domain.Transaction{}, fmt.Errorf("invalid refund amount")
+		return domain.Transaction{}, apierr.BadRequest("invalid refund amount")
 	}
 	txType := domain.TransactionTypeRefund
 	if amount < order.Amount {

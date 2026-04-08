@@ -34,7 +34,7 @@ func (h *PaymentHandler) CreateDeposit(w http.ResponseWriter, r *http.Request) {
 	}
 	payment, err := h.service.CreateDeposit(user, req.Amount)
 	if err != nil {
-		response.Error(w, http.StatusBadRequest, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusCreated, payment)
@@ -48,7 +48,7 @@ func (h *PaymentHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	}
 	tx, err := h.service.ProcessWebhook(req.ExternalID)
 	if err != nil {
-		response.Error(w, http.StatusBadRequest, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusOK, tx)
@@ -58,7 +58,7 @@ func (h *PaymentHandler) Balance(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
 	balance, err := h.service.Balance(user.ID)
 	if err != nil {
-		response.Error(w, http.StatusInternalServerError, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusOK, map[string]int64{"balance": balance})

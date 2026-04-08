@@ -49,6 +49,7 @@ func New(services *service.Registry) http.Handler {
 			secure.Post("/requests/{id}/bids", bidHandler.Create)
 			secure.Post("/orders/from-offer", orderHandler.CreateFromOffer)
 			secure.Post("/orders/from-bid", orderHandler.CreateFromBid)
+			secure.Get("/orders", orderHandler.List)
 			secure.Get("/orders/{id}", orderHandler.Get)
 			secure.Patch("/orders/{id}/status", orderHandler.UpdateStatus)
 			secure.Post("/payments/deposits", paymentHandler.CreateDeposit)

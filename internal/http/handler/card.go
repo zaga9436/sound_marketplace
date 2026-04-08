@@ -46,7 +46,7 @@ func (h *CardHandler) Create(w http.ResponseWriter, r *http.Request) {
 		IsPublished: req.IsPublished,
 	})
 	if err != nil {
-		response.Error(w, http.StatusBadRequest, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusCreated, card)
@@ -67,7 +67,7 @@ func (h *CardHandler) List(w http.ResponseWriter, r *http.Request) {
 func (h *CardHandler) Get(w http.ResponseWriter, r *http.Request) {
 	card, err := h.service.Get(chi.URLParam(r, "id"))
 	if err != nil {
-		response.Error(w, http.StatusNotFound, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusOK, card)
@@ -89,7 +89,7 @@ func (h *CardHandler) Update(w http.ResponseWriter, r *http.Request) {
 		IsPublished: req.IsPublished,
 	})
 	if err != nil {
-		response.Error(w, http.StatusBadRequest, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusOK, card)

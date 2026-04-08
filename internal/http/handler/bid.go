@@ -33,7 +33,7 @@ func (h *BidHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	bid, err := h.service.Create(user, chi.URLParam(r, "id"), req.Price, req.Message)
 	if err != nil {
-		response.Error(w, http.StatusBadRequest, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusCreated, bid)
@@ -43,7 +43,7 @@ func (h *BidHandler) List(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
 	bids, err := h.service.List(user, chi.URLParam(r, "id"))
 	if err != nil {
-		response.Error(w, http.StatusBadRequest, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	if bids == nil {

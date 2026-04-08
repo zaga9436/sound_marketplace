@@ -2,9 +2,9 @@ package service
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
+	"github.com/soundmarket/backend/internal/apierr"
 	"github.com/soundmarket/backend/internal/domain"
 	"github.com/soundmarket/backend/internal/notifications"
 	"github.com/soundmarket/backend/internal/repository"
@@ -21,26 +21,26 @@ func NewBidService(store repository.Store, notifier notifications.Service) *BidS
 
 func (s *BidService) Create(actor domain.User, requestID string, price int64, message string) (domain.Bid, error) {
 	if actor.Role != domain.RoleEngineer {
-		return domain.Bid{}, fmt.Errorf("only engineer can submit bids")
+		return domain.Bid{}, apierr.Forbidden("only engineer can submit bids")
 	}
 	if price <= 0 {
-		return domain.Bid{}, fmt.Errorf("price must be positive")
+		return domain.Bid{}, apierr.BadRequest("price must be positive")
 	}
 	if strings.TrimSpace(message) == "" {
-		return domain.Bid{}, fmt.Errorf("message is required")
+		return domain.Bid{}, apierr.BadRequest("message is required")
 	}
 	card, err := s.store.GetCard(requestID)
 	if err != nil {
-		return domain.Bid{}, err
+		return domain.Bid{}, apierr.NotFound("request not found")
 	}
 	if card.CardType != domain.CardTypeRequest {
-		return domain.Bid{}, fmt.Errorf("bids are allowed only for requests")
+		return domain.Bid{}, apierr.BadRequest("bids are allowed only for requests")
 	}
 	if card.AuthorID == actor.ID {
-		return domain.Bid{}, fmt.Errorf("request author cannot bid on own request")
+		return domain.Bid{}, apierr.Forbidden("request author cannot bid on own request")
 	}
 	if _, err := s.store.GetBidByRequestAndEngineer(requestID, actor.ID); err == nil {
-		return domain.Bid{}, fmt.Errorf("bid for this request already exists")
+		return domain.Bid{}, apierr.BadRequest("bid for this request already exists")
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return domain.Bid{}, err
 	}
@@ -60,13 +60,13 @@ func (s *BidService) Create(actor domain.User, requestID string, price int64, me
 func (s *BidService) List(actor domain.User, requestID string) ([]domain.Bid, error) {
 	card, err := s.store.GetCard(requestID)
 	if err != nil {
-		return nil, err
+		return nil, apierr.NotFound("request not found")
 	}
 	if card.CardType != domain.CardTypeRequest {
-		return nil, fmt.Errorf("bids are allowed only for requests")
+		return nil, apierr.BadRequest("bids are allowed only for requests")
 	}
 	if actor.Role != domain.RoleAdmin && actor.ID != card.AuthorID {
-		return nil, fmt.Errorf("forbidden")
+		return nil, apierr.Forbidden("forbidden")
 	}
 
 	if actor.Role == domain.RoleAdmin {

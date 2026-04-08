@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/soundmarket/backend/internal/apierr"
 	"github.com/soundmarket/backend/internal/domain"
 	"github.com/soundmarket/backend/internal/repository"
 )
@@ -14,9 +15,17 @@ func NewProfileService(store repository.Store) *ProfileService {
 }
 
 func (s *ProfileService) Get(userID string) (domain.Profile, error) {
-	return s.store.GetProfile(userID)
+	profile, err := s.store.GetProfile(userID)
+	if err != nil {
+		return domain.Profile{}, apierr.NotFound("profile not found")
+	}
+	return profile, nil
 }
 
 func (s *ProfileService) Update(userID, displayName, bio string) (domain.Profile, error) {
-	return s.store.UpdateProfile(userID, displayName, bio)
+	profile, err := s.store.UpdateProfile(userID, displayName, bio)
+	if err != nil {
+		return domain.Profile{}, apierr.NotFound("profile not found")
+	}
+	return profile, nil
 }

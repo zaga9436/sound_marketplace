@@ -2,8 +2,8 @@ package service
 
 import (
 	"errors"
-	"fmt"
 
+	"github.com/soundmarket/backend/internal/apierr"
 	"github.com/soundmarket/backend/internal/domain"
 	"github.com/soundmarket/backend/internal/notifications"
 	"github.com/soundmarket/backend/internal/repository"
@@ -20,20 +20,20 @@ func NewOrderService(store repository.Store, notifier notifications.Service) *Or
 
 func (s *OrderService) CreateFromOffer(customer domain.User, cardID string) (domain.Order, error) {
 	if customer.Role != domain.RoleCustomer {
-		return domain.Order{}, fmt.Errorf("only customer can create order")
+		return domain.Order{}, apierr.Forbidden("only customer can create order")
 	}
 
 	var created domain.Order
 	err := s.store.WithTx(func(tx repository.Store) error {
 		card, err := tx.GetCard(cardID)
 		if err != nil {
-			return err
+			return apierr.NotFound("offer not found")
 		}
 		if card.CardType != domain.CardTypeOffer {
-			return fmt.Errorf("card is not an offer")
+			return apierr.BadRequest("card is not an offer")
 		}
 		if _, err := tx.GetOrderByCardAndCustomer(cardID, customer.ID); err == nil {
-			return fmt.Errorf("order for this offer already exists")
+			return apierr.BadRequest("order for this offer already exists")
 		} else if !errors.Is(err, repository.ErrNotFound) {
 			return err
 		}
@@ -42,7 +42,7 @@ func (s *OrderService) CreateFromOffer(customer domain.User, cardID string) (dom
 			return err
 		}
 		if balance < card.Price {
-			return fmt.Errorf("insufficient balance")
+			return apierr.BadRequest("insufficient balance")
 		}
 
 		created, err = tx.CreateOrder(domain.Order{
@@ -77,27 +77,27 @@ func (s *OrderService) CreateFromOffer(customer domain.User, cardID string) (dom
 
 func (s *OrderService) CreateFromBid(customer domain.User, bidID string) (domain.Order, error) {
 	if customer.Role != domain.RoleCustomer {
-		return domain.Order{}, fmt.Errorf("only customer can accept bid")
+		return domain.Order{}, apierr.Forbidden("only customer can accept bid")
 	}
 
 	var created domain.Order
 	err := s.store.WithTx(func(tx repository.Store) error {
 		bid, err := tx.GetBid(bidID)
 		if err != nil {
-			return err
+			return apierr.NotFound("bid not found")
 		}
 		requestCard, err := tx.GetCard(bid.RequestID)
 		if err != nil {
-			return err
+			return apierr.NotFound("request not found")
 		}
 		if requestCard.CardType != domain.CardTypeRequest {
-			return fmt.Errorf("bid does not belong to request")
+			return apierr.BadRequest("bid does not belong to request")
 		}
 		if requestCard.AuthorID != customer.ID {
-			return fmt.Errorf("forbidden")
+			return apierr.Forbidden("forbidden")
 		}
 		if _, err := tx.GetOrderByBidID(bid.ID); err == nil {
-			return fmt.Errorf("order for this bid already exists")
+			return apierr.BadRequest("order for this bid already exists")
 		} else if !errors.Is(err, repository.ErrNotFound) {
 			return err
 		}
@@ -106,7 +106,7 @@ func (s *OrderService) CreateFromBid(customer domain.User, bidID string) (domain
 			return err
 		}
 		if balance < bid.Price {
-			return fmt.Errorf("insufficient balance")
+			return apierr.BadRequest("insufficient balance")
 		}
 
 		created, err = tx.CreateOrder(domain.Order{
@@ -140,12 +140,37 @@ func (s *OrderService) CreateFromBid(customer domain.User, bidID string) (domain
 func (s *OrderService) Get(orderID string, actor domain.User) (domain.Order, error) {
 	order, err := s.store.GetOrder(orderID)
 	if err != nil {
-		return domain.Order{}, err
+		return domain.Order{}, apierr.NotFound("order not found")
 	}
 	if actor.Role != domain.RoleAdmin && actor.ID != order.CustomerID && actor.ID != order.EngineerID {
-		return domain.Order{}, fmt.Errorf("forbidden")
+		return domain.Order{}, apierr.Forbidden("forbidden")
 	}
 	return order, nil
+}
+
+func (s *OrderService) List(actor domain.User) ([]domain.Order, error) {
+	var (
+		orders []domain.Order
+		err    error
+	)
+
+	switch actor.Role {
+	case domain.RoleCustomer:
+		orders, err = s.store.ListOrdersByCustomer(actor.ID)
+	case domain.RoleEngineer:
+		orders, err = s.store.ListOrdersByEngineer(actor.ID)
+	case domain.RoleAdmin:
+		orders, err = s.store.ListOrders()
+	default:
+		return nil, apierr.Forbidden("forbidden")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if orders == nil {
+		return []domain.Order{}, nil
+	}
+	return orders, nil
 }
 
 func (s *OrderService) UpdateStatus(actor domain.User, orderID string, next domain.OrderStatus) (domain.Order, error) {
@@ -153,13 +178,13 @@ func (s *OrderService) UpdateStatus(actor domain.User, orderID string, next doma
 	err := s.store.WithTx(func(tx repository.Store) error {
 		order, err := tx.GetOrder(orderID)
 		if err != nil {
-			return err
+			return apierr.NotFound("order not found")
 		}
 		if actor.Role != domain.RoleAdmin && actor.ID != order.CustomerID && actor.ID != order.EngineerID {
-			return fmt.Errorf("forbidden")
+			return apierr.Forbidden("forbidden")
 		}
 		if !isStatusTransitionAllowed(order.Status, next) {
-			return fmt.Errorf("invalid status transition")
+			return apierr.BadRequest("invalid status transition")
 		}
 		if err := validateStatusActor(actor, order, next); err != nil {
 			return err
@@ -207,15 +232,15 @@ func validateStatusActor(actor domain.User, order domain.Order, next domain.Orde
 	switch next {
 	case domain.OrderStatusInProgress, domain.OrderStatusReview:
 		if actor.ID != order.EngineerID {
-			return fmt.Errorf("only engineer can move order to %s", next)
+			return apierr.Forbidden("only engineer can perform this status transition")
 		}
 	case domain.OrderStatusCompleted, domain.OrderStatusCancelled:
 		if actor.ID != order.CustomerID {
-			return fmt.Errorf("only customer can move order to %s", next)
+			return apierr.Forbidden("only customer can perform this status transition")
 		}
 	case domain.OrderStatusDispute:
 		if actor.ID != order.CustomerID && actor.ID != order.EngineerID {
-			return fmt.Errorf("only order participants can open dispute")
+			return apierr.Forbidden("only order participants can open dispute")
 		}
 	}
 

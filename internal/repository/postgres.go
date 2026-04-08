@@ -361,6 +361,29 @@ func (s *PostgresStore) GetOrderByCardAndCustomer(cardID, customerID string) (do
 	))
 }
 
+func (s *PostgresStore) ListOrdersByCustomer(customerID string) ([]domain.Order, error) {
+	return s.listOrders(
+		`SELECT id, COALESCE(card_id, ''), COALESCE(request_id, ''), COALESCE(bid_id, ''), customer_id, engineer_id, amount, status, COALESCE(delivery_notes, ''), COALESCE(dispute_reason, ''), created_at, updated_at
+		 FROM orders WHERE customer_id = $1 ORDER BY created_at DESC`,
+		customerID,
+	)
+}
+
+func (s *PostgresStore) ListOrdersByEngineer(engineerID string) ([]domain.Order, error) {
+	return s.listOrders(
+		`SELECT id, COALESCE(card_id, ''), COALESCE(request_id, ''), COALESCE(bid_id, ''), customer_id, engineer_id, amount, status, COALESCE(delivery_notes, ''), COALESCE(dispute_reason, ''), created_at, updated_at
+		 FROM orders WHERE engineer_id = $1 ORDER BY created_at DESC`,
+		engineerID,
+	)
+}
+
+func (s *PostgresStore) ListOrders() ([]domain.Order, error) {
+	return s.listOrders(
+		`SELECT id, COALESCE(card_id, ''), COALESCE(request_id, ''), COALESCE(bid_id, ''), customer_id, engineer_id, amount, status, COALESCE(delivery_notes, ''), COALESCE(dispute_reason, ''), created_at, updated_at
+		 FROM orders ORDER BY created_at DESC`,
+	)
+}
+
 func (s *PostgresStore) UpdateOrder(order domain.Order) (domain.Order, error) {
 	order.LastStatusTime = time.Now().UTC()
 	_, err := s.runner().Exec(
@@ -491,4 +514,37 @@ func (s *PostgresStore) scanOrder(row *sql.Row) (domain.Order, error) {
 	}
 	order.Status = domain.OrderStatus(status)
 	return order, nil
+}
+
+func (s *PostgresStore) listOrders(query string, args ...interface{}) ([]domain.Order, error) {
+	rows, err := s.runner().Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	orders := make([]domain.Order, 0)
+	for rows.Next() {
+		var order domain.Order
+		var status string
+		if err := rows.Scan(
+			&order.ID,
+			&order.CardID,
+			&order.RequestID,
+			&order.BidID,
+			&order.CustomerID,
+			&order.EngineerID,
+			&order.Amount,
+			&status,
+			&order.DeliveryNotes,
+			&order.DisputeReason,
+			&order.CreatedAt,
+			&order.LastStatusTime,
+		); err != nil {
+			return nil, err
+		}
+		order.Status = domain.OrderStatus(status)
+		orders = append(orders, order)
+	}
+	return orders, rows.Err()
 }

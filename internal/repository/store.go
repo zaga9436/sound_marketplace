@@ -26,6 +26,9 @@ type Store interface {
 	GetOrder(orderID string) (domain.Order, error)
 	GetOrderByBidID(bidID string) (domain.Order, error)
 	GetOrderByCardAndCustomer(cardID, customerID string) (domain.Order, error)
+	ListOrdersByCustomer(customerID string) ([]domain.Order, error)
+	ListOrdersByEngineer(engineerID string) ([]domain.Order, error)
+	ListOrders() ([]domain.Order, error)
 	UpdateOrder(order domain.Order) (domain.Order, error)
 
 	CreateTransaction(tx domain.Transaction) (domain.Transaction, error)

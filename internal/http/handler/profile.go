@@ -27,7 +27,7 @@ func (h *ProfileHandler) Me(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
 	profile, err := h.service.Get(user.ID)
 	if err != nil {
-		response.Error(w, http.StatusNotFound, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusOK, profile)
@@ -36,7 +36,7 @@ func (h *ProfileHandler) Me(w http.ResponseWriter, r *http.Request) {
 func (h *ProfileHandler) Public(w http.ResponseWriter, r *http.Request) {
 	profile, err := h.service.Get(chi.URLParam(r, "id"))
 	if err != nil {
-		response.Error(w, http.StatusNotFound, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusOK, profile)
@@ -51,7 +51,7 @@ func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	profile, err := h.service.Update(user.ID, req.DisplayName, req.Bio)
 	if err != nil {
-		response.Error(w, http.StatusBadRequest, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusOK, profile)

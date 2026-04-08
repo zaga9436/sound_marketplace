@@ -40,7 +40,7 @@ func (h *OrderHandler) CreateFromOffer(w http.ResponseWriter, r *http.Request) {
 	}
 	order, err := h.service.CreateFromOffer(user, req.CardID)
 	if err != nil {
-		response.Error(w, http.StatusBadRequest, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusCreated, order)
@@ -55,17 +55,30 @@ func (h *OrderHandler) CreateFromBid(w http.ResponseWriter, r *http.Request) {
 	}
 	order, err := h.service.CreateFromBid(user, req.BidID)
 	if err != nil {
-		response.Error(w, http.StatusBadRequest, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusCreated, order)
+}
+
+func (h *OrderHandler) List(w http.ResponseWriter, r *http.Request) {
+	user := middleware.CurrentUser(r)
+	orders, err := h.service.List(user)
+	if err != nil {
+		response.FromError(w, err)
+		return
+	}
+	if orders == nil {
+		orders = []domain.Order{}
+	}
+	response.JSON(w, http.StatusOK, orders)
 }
 
 func (h *OrderHandler) Get(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
 	order, err := h.service.Get(chi.URLParam(r, "id"), user)
 	if err != nil {
-		response.Error(w, http.StatusBadRequest, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusOK, order)
@@ -80,7 +93,7 @@ func (h *OrderHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	order, err := h.service.UpdateStatus(user, chi.URLParam(r, "id"), req.Status)
 	if err != nil {
-		response.Error(w, http.StatusBadRequest, err.Error())
+		response.FromError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusOK, order)

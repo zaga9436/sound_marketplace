@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/soundmarket/backend/internal/apierr"
 	"github.com/soundmarket/backend/internal/domain"
 	"github.com/soundmarket/backend/internal/notifications"
 	"github.com/soundmarket/backend/internal/repository"
@@ -20,25 +21,25 @@ func NewCardService(store repository.Store, notifier notifications.Service) *Car
 
 func (s *CardService) Create(actor domain.User, payload domain.Card) (domain.Card, error) {
 	if payload.CardType != domain.CardTypeOffer && payload.CardType != domain.CardTypeRequest {
-		return domain.Card{}, fmt.Errorf("card_type must be offer or request")
+		return domain.Card{}, apierr.BadRequest("card_type must be offer or request")
 	}
 	if payload.Kind != domain.CardKindProduct && payload.Kind != domain.CardKindService {
-		return domain.Card{}, fmt.Errorf("kind must be product or service")
+		return domain.Card{}, apierr.BadRequest("kind must be product or service")
 	}
 	if payload.CardType == domain.CardTypeOffer && actor.Role != domain.RoleEngineer {
-		return domain.Card{}, fmt.Errorf("only engineer can create offers")
+		return domain.Card{}, apierr.Forbidden("only engineer can create offers")
 	}
 	if payload.CardType == domain.CardTypeRequest && actor.Role != domain.RoleCustomer {
-		return domain.Card{}, fmt.Errorf("only customer can create requests")
+		return domain.Card{}, apierr.Forbidden("only customer can create requests")
 	}
 	if strings.TrimSpace(payload.Title) == "" {
-		return domain.Card{}, fmt.Errorf("title is required")
+		return domain.Card{}, apierr.BadRequest("title is required")
 	}
 	if strings.TrimSpace(payload.Description) == "" {
-		return domain.Card{}, fmt.Errorf("description is required")
+		return domain.Card{}, apierr.BadRequest("description is required")
 	}
 	if payload.Price < 0 {
-		return domain.Card{}, fmt.Errorf("price must be non-negative")
+		return domain.Card{}, apierr.BadRequest("price must be non-negative")
 	}
 
 	payload.AuthorID = actor.ID
@@ -54,10 +55,10 @@ func (s *CardService) Create(actor domain.User, payload domain.Card) (domain.Car
 func (s *CardService) Update(actor domain.User, cardID string, payload domain.Card) (domain.Card, error) {
 	card, err := s.store.GetCard(cardID)
 	if err != nil {
-		return domain.Card{}, err
+		return domain.Card{}, apierr.NotFound("card not found")
 	}
 	if actor.Role != domain.RoleAdmin && card.AuthorID != actor.ID {
-		return domain.Card{}, fmt.Errorf("forbidden")
+		return domain.Card{}, apierr.Forbidden("forbidden")
 	}
 	payload.CardType = card.CardType
 	payload.AuthorID = card.AuthorID
@@ -76,5 +77,9 @@ func (s *CardService) List(cardType, query string) ([]domain.Card, error) {
 }
 
 func (s *CardService) Get(cardID string) (domain.Card, error) {
-	return s.store.GetCard(cardID)
+	card, err := s.store.GetCard(cardID)
+	if err != nil {
+		return domain.Card{}, apierr.NotFound("card not found")
+	}
+	return card, nil
 }
