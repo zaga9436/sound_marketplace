@@ -31,6 +31,7 @@ type Registry struct {
 	Dispute     *DisputeService
 	Review      *ReviewService
 	Media       *MediaService
+	Deliverable *DeliverableService
 	Chat        *ChatService
 	Notifications *NotificationService
 	Admin       *AdminService
@@ -55,6 +56,7 @@ func NewRegistry(deps Dependencies) *Registry {
 		Dispute:     disputeService,
 		Review:      NewReviewService(deps.Store, deps.Notifier),
 		Media:       NewMediaService(deps.Config, deps.Store, deps.StorageAdapter),
+		Deliverable: NewDeliverableService(deps.Config, deps.Store, deps.StorageAdapter, deps.Notifier),
 		Chat:        chatService,
 		Notifications: notificationService,
 		Admin:       adminService,

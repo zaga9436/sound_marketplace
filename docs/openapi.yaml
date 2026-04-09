@@ -407,6 +407,65 @@ paths:
       responses:
         '201':
           description: Review created
+  /orders/{id}/deliverables:
+    get:
+      summary: List private order deliverables
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Deliverables
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Deliverable'
+    post:
+      summary: Upload new private deliverable version for order
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Deliverable uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Deliverable'
+  /orders/{id}/deliverables/{deliverable_id}/download:
+    get:
+      summary: Get signed URL for private order deliverable
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - in: path
+          name: deliverable_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Signed URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadResponse'
   /orders/{id}/dispute:
     get:
       summary: Get dispute for order
@@ -943,6 +1002,31 @@ components:
           enum: [preview, full]
         url:
           type: string
+        created_at:
+          type: string
+          format: date-time
+    Deliverable:
+      type: object
+      properties:
+        id:
+          type: string
+        order_id:
+          type: string
+        uploaded_by:
+          type: string
+        storage_key:
+          type: string
+        original_filename:
+          type: string
+        content_type:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+        version:
+          type: integer
+        is_active:
+          type: boolean
         created_at:
           type: string
           format: date-time

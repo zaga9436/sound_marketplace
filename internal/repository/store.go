@@ -27,6 +27,11 @@ type Store interface {
 	CreateMedia(media domain.MediaFile) (domain.MediaFile, error)
 	ListMediaByCardAndRole(cardID string, role domain.MediaRole) ([]domain.MediaFile, error)
 	GetLatestMediaByCardAndRole(cardID string, role domain.MediaRole) (domain.MediaFile, error)
+	CreateDeliverable(deliverable domain.Deliverable) (domain.Deliverable, error)
+	ListDeliverablesByOrder(orderID string) ([]domain.Deliverable, error)
+	GetDeliverable(deliverableID string) (domain.Deliverable, error)
+	GetLatestDeliverableByOrder(orderID string) (domain.Deliverable, error)
+	DeactivateDeliverablesByOrder(orderID string) error
 	UserHasCompletedCardAccess(cardID, userID string) (bool, error)
 	GetChatRoomByOrderID(orderID string) (string, error)
 	CreateMessage(orderID, senderID, body string) (domain.ChatMessage, error)

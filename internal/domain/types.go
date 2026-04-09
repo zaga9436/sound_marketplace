@@ -184,6 +184,19 @@ type MediaFile struct {
 	CreatedAt        time.Time `json:"created_at"`
 }
 
+type Deliverable struct {
+	ID               string    `json:"id"`
+	OrderID          string    `json:"order_id"`
+	UploadedBy       string    `json:"uploaded_by"`
+	StorageKey       string    `json:"storage_key"`
+	OriginalFilename string    `json:"original_filename"`
+	ContentType      string    `json:"content_type"`
+	SizeBytes        int64     `json:"size_bytes"`
+	Version          int       `json:"version"`
+	IsActive         bool      `json:"is_active"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
 type ChatMessage struct {
 	ID         string     `json:"id"`
 	ChatRoomID string     `json:"chat_room_id"`

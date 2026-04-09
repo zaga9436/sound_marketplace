@@ -413,6 +413,71 @@ func (s *PostgresStore) GetLatestMediaByCardAndRole(cardID string, role domain.M
 	))
 }
 
+func (s *PostgresStore) CreateDeliverable(deliverable domain.Deliverable) (domain.Deliverable, error) {
+	deliverable.ID = uuid.NewString()
+	deliverable.CreatedAt = time.Now().UTC()
+	_, err := s.runner().Exec(
+		`INSERT INTO deliverables (id, order_id, uploaded_by, storage_key, original_filename, content_type, size_bytes, version, is_active, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		deliverable.ID, deliverable.OrderID, deliverable.UploadedBy, deliverable.StorageKey, deliverable.OriginalFilename, deliverable.ContentType, deliverable.SizeBytes, deliverable.Version, deliverable.IsActive, deliverable.CreatedAt,
+	)
+	if err != nil {
+		return domain.Deliverable{}, err
+	}
+	return deliverable, nil
+}
+
+func (s *PostgresStore) ListDeliverablesByOrder(orderID string) ([]domain.Deliverable, error) {
+	rows, err := s.runner().Query(
+		`SELECT id, order_id, uploaded_by, storage_key, original_filename, content_type, size_bytes, version, is_active, created_at
+		 FROM deliverables
+		 WHERE order_id = $1
+		 ORDER BY version DESC, created_at DESC`,
+		orderID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	deliverables := make([]domain.Deliverable, 0)
+	for rows.Next() {
+		var deliverable domain.Deliverable
+		if err := rows.Scan(&deliverable.ID, &deliverable.OrderID, &deliverable.UploadedBy, &deliverable.StorageKey, &deliverable.OriginalFilename, &deliverable.ContentType, &deliverable.SizeBytes, &deliverable.Version, &deliverable.IsActive, &deliverable.CreatedAt); err != nil {
+			return nil, err
+		}
+		deliverables = append(deliverables, deliverable)
+	}
+	return deliverables, rows.Err()
+}
+
+func (s *PostgresStore) GetDeliverable(deliverableID string) (domain.Deliverable, error) {
+	return s.scanDeliverable(s.runner().QueryRow(
+		`SELECT id, order_id, uploaded_by, storage_key, original_filename, content_type, size_bytes, version, is_active, created_at
+		 FROM deliverables
+		 WHERE id = $1`,
+		deliverableID,
+	))
+}
+
+func (s *PostgresStore) GetLatestDeliverableByOrder(orderID string) (domain.Deliverable, error) {
+	return s.scanDeliverable(s.runner().QueryRow(
+		`SELECT id, order_id, uploaded_by, storage_key, original_filename, content_type, size_bytes, version, is_active, created_at
+		 FROM deliverables
+		 WHERE order_id = $1
+		 ORDER BY version DESC, created_at DESC
+		 LIMIT 1`,
+		orderID,
+	))
+}
+
+func (s *PostgresStore) DeactivateDeliverablesByOrder(orderID string) error {
+	_, err := s.runner().Exec(
+		`UPDATE deliverables SET is_active = FALSE WHERE order_id = $1 AND is_active = TRUE`,
+		orderID,
+	)
+	return err
+}
+
 func (s *PostgresStore) UserHasCompletedCardAccess(cardID, userID string) (bool, error) {
 	var exists bool
 	err := s.runner().QueryRow(
@@ -1246,6 +1311,29 @@ func (s *PostgresStore) scanMedia(row *sql.Row) (domain.MediaFile, error) {
 	}
 	media.MediaRole = domain.MediaRole(roleValue)
 	return media, nil
+}
+
+func (s *PostgresStore) scanDeliverable(row *sql.Row) (domain.Deliverable, error) {
+	var deliverable domain.Deliverable
+	err := row.Scan(
+		&deliverable.ID,
+		&deliverable.OrderID,
+		&deliverable.UploadedBy,
+		&deliverable.StorageKey,
+		&deliverable.OriginalFilename,
+		&deliverable.ContentType,
+		&deliverable.SizeBytes,
+		&deliverable.Version,
+		&deliverable.IsActive,
+		&deliverable.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Deliverable{}, ErrNotFound
+		}
+		return domain.Deliverable{}, err
+	}
+	return deliverable, nil
 }
 
 func (s *PostgresStore) scanReview(row *sql.Row) (domain.Review, error) {
