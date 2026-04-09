@@ -72,6 +72,7 @@ type Card struct {
 	Description string    `json:"description"`
 	Price       int64     `json:"price"`
 	Tags        []string  `json:"tags"`
+	PreviewURLs []string  `json:"preview_urls"`
 	IsPublished bool      `json:"is_published"`
 	CreatedAt   time.Time `json:"created_at"`
 }
@@ -155,4 +156,24 @@ type Review struct {
 	Rating       int       `json:"rating"`
 	Text         string    `json:"text"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+type MediaRole string
+
+const (
+	MediaRolePreview MediaRole = "preview"
+	MediaRoleFull    MediaRole = "full"
+)
+
+type MediaFile struct {
+	ID               string    `json:"id"`
+	CardID           string    `json:"card_id,omitempty"`
+	OwnerUserID      string    `json:"owner_user_id"`
+	FileKey          string    `json:"file_key"`
+	OriginalFilename string    `json:"original_filename"`
+	ContentType      string    `json:"content_type"`
+	SizeBytes        int64     `json:"size_bytes"`
+	MediaRole        MediaRole `json:"media_role"`
+	URL              string    `json:"url,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
 }

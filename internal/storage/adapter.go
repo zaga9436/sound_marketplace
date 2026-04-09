@@ -1,25 +1,23 @@
 package storage
 
 import (
-	"fmt"
+	"context"
+	"io"
 	"time"
-
-	"github.com/soundmarket/backend/internal/config"
 )
 
+type UploadOptions struct {
+	Public bool
+}
+
+type StoredObject struct {
+	Key       string `json:"key"`
+	PublicURL string `json:"public_url,omitempty"`
+}
+
 type Adapter interface {
-	SignedURL(objectKey string) string
+	Upload(ctx context.Context, key, contentType string, body io.Reader, opts UploadOptions) (StoredObject, error)
+	Delete(ctx context.Context, key string) error
+	GenerateSignedURL(ctx context.Context, key string, ttl time.Duration) (string, error)
+	PublicURL(key string) string
 }
-
-type S3Adapter struct {
-	cfg *config.Config
-}
-
-func NewS3Adapter(cfg *config.Config) *S3Adapter {
-	return &S3Adapter{cfg: cfg}
-}
-
-func (a *S3Adapter) SignedURL(objectKey string) string {
-	return fmt.Sprintf("%s/%s/%s?expires=%d", a.cfg.S3Endpoint, a.cfg.S3Bucket, objectKey, time.Now().Add(a.cfg.SignedURLTTL).Unix())
-}
-

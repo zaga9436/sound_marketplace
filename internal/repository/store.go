@@ -16,6 +16,10 @@ type Store interface {
 	UpdateCard(cardID string, payload domain.Card) (domain.Card, error)
 	ListCards(cardType, query string) ([]domain.Card, error)
 	GetCard(cardID string) (domain.Card, error)
+	CreateMedia(media domain.MediaFile) (domain.MediaFile, error)
+	ListMediaByCardAndRole(cardID string, role domain.MediaRole) ([]domain.MediaFile, error)
+	GetLatestMediaByCardAndRole(cardID string, role domain.MediaRole) (domain.MediaFile, error)
+	UserHasCompletedCardAccess(cardID, userID string) (bool, error)
 
 	CreateBid(bid domain.Bid) (domain.Bid, error)
 	ListBidsByRequest(requestID string) ([]domain.Bid, error)

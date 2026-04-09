@@ -1,21 +1,24 @@
 package service
 
 import (
+	"context"
 	"strings"
 
 	"github.com/soundmarket/backend/internal/apierr"
 	"github.com/soundmarket/backend/internal/domain"
 	"github.com/soundmarket/backend/internal/notifications"
 	"github.com/soundmarket/backend/internal/repository"
+	"github.com/soundmarket/backend/internal/storage"
 )
 
 type CardService struct {
 	store    repository.Store
 	notifier notifications.Service
+	storage  storage.Adapter
 }
 
-func NewCardService(store repository.Store, notifier notifications.Service) *CardService {
-	return &CardService{store: store, notifier: notifier}
+func NewCardService(store repository.Store, notifier notifications.Service, storageAdapter storage.Adapter) *CardService {
+	return &CardService{store: store, notifier: notifier, storage: storageAdapter}
 }
 
 func (s *CardService) Create(actor domain.User, payload domain.Card) (domain.Card, error) {
@@ -47,6 +50,7 @@ func (s *CardService) Create(actor domain.User, payload domain.Card) (domain.Car
 	if err != nil {
 		return domain.Card{}, err
 	}
+	card.PreviewURLs = []string{}
 	s.notifier.Publish(actor.ID, "card_published", "Card published")
 	return card, nil
 }
@@ -61,12 +65,26 @@ func (s *CardService) Update(actor domain.User, cardID string, payload domain.Ca
 	}
 	payload.CardType = card.CardType
 	payload.AuthorID = card.AuthorID
-	return s.store.UpdateCard(cardID, payload)
+	updated, err := s.store.UpdateCard(cardID, payload)
+	if err != nil {
+		return domain.Card{}, err
+	}
+	updatedCards := []domain.Card{updated}
+	if err := s.attachPreviewURLs(context.Background(), updatedCards); err == nil {
+		updated = updatedCards[0]
+	}
+	if updated.PreviewURLs == nil {
+		updated.PreviewURLs = []string{}
+	}
+	return updated, nil
 }
 
 func (s *CardService) List(cardType, query string) ([]domain.Card, error) {
 	cards, err := s.store.ListCards(cardType, query)
 	if err != nil {
+		return nil, err
+	}
+	if err := s.attachPreviewURLs(context.Background(), cards); err != nil {
 		return nil, err
 	}
 	if cards == nil {
@@ -80,5 +98,23 @@ func (s *CardService) Get(cardID string) (domain.Card, error) {
 	if err != nil {
 		return domain.Card{}, apierr.NotFound("card not found")
 	}
-	return card, nil
+	cards := []domain.Card{card}
+	if err := s.attachPreviewURLs(context.Background(), cards); err != nil {
+		return domain.Card{}, err
+	}
+	return cards[0], nil
+}
+
+func (s *CardService) attachPreviewURLs(_ context.Context, cards []domain.Card) error {
+	for i := range cards {
+		mediaFiles, err := s.store.ListMediaByCardAndRole(cards[i].ID, domain.MediaRolePreview)
+		if err != nil {
+			return err
+		}
+		cards[i].PreviewURLs = make([]string, 0, len(mediaFiles))
+		for _, media := range mediaFiles {
+			cards[i].PreviewURLs = append(cards[i].PreviewURLs, s.storage.PublicURL(media.FileKey))
+		}
+	}
+	return nil
 }

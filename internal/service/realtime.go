@@ -1,6 +1,9 @@
 package service
 
 import (
+	"context"
+	"time"
+
 	"github.com/soundmarket/backend/internal/storage"
 	"github.com/soundmarket/backend/internal/worker"
 )
@@ -15,9 +18,10 @@ func NewRealtimeService(queue worker.Queue, storage storage.Adapter) *RealtimeSe
 }
 
 func (s *RealtimeService) ChatInfo(orderID string) map[string]string {
+	deliveryURL, _ := s.storage.GenerateSignedURL(context.Background(), "orders/"+orderID+"/preview.m3u8", 15*time.Minute)
 	return map[string]string{
 		"order_id":     orderID,
 		"channel":      "order:" + orderID,
-		"delivery_url": s.storage.SignedURL("orders/" + orderID + "/preview.m3u8"),
+		"delivery_url": deliveryURL,
 	}
 }

@@ -35,6 +35,7 @@ type Config struct {
 	S3AccessKey           string
 	S3SecretKey           string
 	S3UseSSL              bool
+	S3ForcePathStyle      bool
 	SignedURLTTL          time.Duration
 	YooKassaShopID        string
 	YooKassaSecretKey     string
@@ -127,6 +128,9 @@ func Load() (*Config, error) {
 	}
 	if cfg.S3UseSSL, err = strconv.ParseBool(required["S3_USE_SSL"]); err != nil {
 		return nil, fmt.Errorf("parse S3_USE_SSL: %w", err)
+	}
+	if cfg.S3ForcePathStyle, err = strconv.ParseBool(getWithDefault("S3_FORCE_PATH_STYLE", "true")); err != nil {
+		return nil, fmt.Errorf("parse S3_FORCE_PATH_STYLE: %w", err)
 	}
 	if cfg.AutoApplyMigrations, err = strconv.ParseBool(getWithDefault("AUTO_APPLY_MIGRATIONS", defaultAutoApplyMigrations(cfg.AppEnv))); err != nil {
 		return nil, fmt.Errorf("parse AUTO_APPLY_MIGRATIONS: %w", err)

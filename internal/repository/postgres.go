@@ -245,6 +245,80 @@ func (s *PostgresStore) GetCard(cardID string) (domain.Card, error) {
 	return card, nil
 }
 
+func (s *PostgresStore) CreateMedia(media domain.MediaFile) (domain.MediaFile, error) {
+	media.ID = uuid.NewString()
+	media.CreatedAt = time.Now().UTC()
+	visibility := "private"
+	if media.MediaRole == domain.MediaRolePreview {
+		visibility = "public"
+	}
+
+	_, err := s.runner().Exec(
+		`INSERT INTO media_files (id, card_id, uploaded_by, storage_key, original_filename, mime_type, size_bytes, purpose, visibility, is_processed, created_at)
+		 VALUES ($1, NULLIF($2, ''), $3, $4, $5, $6, $7, $8, $9, TRUE, $10)`,
+		media.ID, media.CardID, media.OwnerUserID, media.FileKey, media.OriginalFilename, media.ContentType, media.SizeBytes, string(media.MediaRole), visibility, media.CreatedAt,
+	)
+	if err != nil {
+		return domain.MediaFile{}, err
+	}
+	return media, nil
+}
+
+func (s *PostgresStore) ListMediaByCardAndRole(cardID string, role domain.MediaRole) ([]domain.MediaFile, error) {
+	rows, err := s.runner().Query(
+		`SELECT id, COALESCE(card_id, ''), uploaded_by, storage_key, COALESCE(original_filename, ''), mime_type, COALESCE(size_bytes, 0), purpose, created_at
+		 FROM media_files
+		 WHERE card_id = $1 AND purpose = $2
+		 ORDER BY created_at ASC`,
+		cardID, string(role),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	mediaFiles := make([]domain.MediaFile, 0)
+	for rows.Next() {
+		var media domain.MediaFile
+		var roleValue string
+		if err := rows.Scan(&media.ID, &media.CardID, &media.OwnerUserID, &media.FileKey, &media.OriginalFilename, &media.ContentType, &media.SizeBytes, &roleValue, &media.CreatedAt); err != nil {
+			return nil, err
+		}
+		media.MediaRole = domain.MediaRole(roleValue)
+		mediaFiles = append(mediaFiles, media)
+	}
+	return mediaFiles, rows.Err()
+}
+
+func (s *PostgresStore) GetLatestMediaByCardAndRole(cardID string, role domain.MediaRole) (domain.MediaFile, error) {
+	return s.scanMedia(s.runner().QueryRow(
+		`SELECT id, COALESCE(card_id, ''), uploaded_by, storage_key, COALESCE(original_filename, ''), mime_type, COALESCE(size_bytes, 0), purpose, created_at
+		 FROM media_files
+		 WHERE card_id = $1 AND purpose = $2
+		 ORDER BY created_at DESC
+		 LIMIT 1`,
+		cardID, string(role),
+	))
+}
+
+func (s *PostgresStore) UserHasCompletedCardAccess(cardID, userID string) (bool, error) {
+	var exists bool
+	err := s.runner().QueryRow(
+		`SELECT EXISTS (
+			SELECT 1
+			FROM orders
+			WHERE status = 'completed'
+			  AND (
+			    (card_id = $1 AND (customer_id = $2 OR engineer_id = $2))
+			    OR
+			    (request_id = $1 AND (customer_id = $2 OR engineer_id = $2))
+			  )
+		)`,
+		cardID, userID,
+	).Scan(&exists)
+	return exists, err
+}
+
 func (s *PostgresStore) CreateBid(bid domain.Bid) (domain.Bid, error) {
 	bid.ID = uuid.NewString()
 	bid.CreatedAt = time.Now().UTC()
@@ -694,6 +768,30 @@ func (s *PostgresStore) scanDispute(row *sql.Row) (domain.Dispute, error) {
 		dispute.ClosedAt = &t
 	}
 	return dispute, nil
+}
+
+func (s *PostgresStore) scanMedia(row *sql.Row) (domain.MediaFile, error) {
+	var media domain.MediaFile
+	var roleValue string
+	err := row.Scan(
+		&media.ID,
+		&media.CardID,
+		&media.OwnerUserID,
+		&media.FileKey,
+		&media.OriginalFilename,
+		&media.ContentType,
+		&media.SizeBytes,
+		&roleValue,
+		&media.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.MediaFile{}, ErrNotFound
+		}
+		return domain.MediaFile{}, err
+	}
+	media.MediaRole = domain.MediaRole(roleValue)
+	return media, nil
 }
 
 func (s *PostgresStore) scanReview(row *sql.Row) (domain.Review, error) {

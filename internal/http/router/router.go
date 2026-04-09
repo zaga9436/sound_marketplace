@@ -26,6 +26,7 @@ func New(services *service.Registry) http.Handler {
 	orderHandler := handler.NewOrderHandler(services.Order)
 	disputeHandler := handler.NewDisputeHandler(services.Dispute)
 	reviewHandler := handler.NewReviewHandler(services.Review)
+	mediaHandler := handler.NewMediaHandler(services.Media)
 	paymentHandler := handler.NewPaymentHandler(services.Payment)
 	wsHandler := handler.NewWSHandler(services.Realtime)
 
@@ -49,6 +50,9 @@ func New(services *service.Registry) http.Handler {
 			secure.Put("/profiles/me", profileHandler.Update)
 			secure.Post("/cards", cardHandler.Create)
 			secure.Put("/cards/{id}", cardHandler.Update)
+			secure.Post("/cards/{id}/media/preview", mediaHandler.UploadPreview)
+			secure.Post("/cards/{id}/media/full", mediaHandler.UploadFull)
+			secure.Get("/cards/{id}/download", mediaHandler.DownloadFull)
 			secure.Get("/requests/{id}/bids", bidHandler.List)
 			secure.Post("/requests/{id}/bids", bidHandler.Create)
 			secure.Route("/orders", func(orderRoutes chi.Router) {

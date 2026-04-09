@@ -54,7 +54,12 @@ func New() (*App, error) {
 		_ = redisClient.Close()
 		return nil, err
 	}
-	storageAdapter := storage.NewS3Adapter(cfg)
+	storageAdapter, err := storage.NewS3Adapter(cfg)
+	if err != nil {
+		_ = postgresDB.Close()
+		_ = redisClient.Close()
+		return nil, err
+	}
 	paymentAdapter := payments.NewMockYooKassaAdapter(cfg)
 	notifier := notifications.NewRepositoryBackedService(store)
 	workerQueue := worker.NewInMemoryQueue()

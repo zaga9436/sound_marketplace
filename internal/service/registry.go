@@ -28,6 +28,7 @@ type Registry struct {
 	Order       *OrderService
 	Dispute     *DisputeService
 	Review      *ReviewService
+	Media       *MediaService
 	Payment     *PaymentService
 	Health      *HealthService
 	Realtime    *RealtimeService
@@ -37,12 +38,13 @@ type Registry struct {
 func NewRegistry(deps Dependencies) *Registry {
 	return &Registry{
 		Auth:        NewAuthService(deps.Store, deps.AuthManager),
-		Profile:     NewProfileService(deps.Store),
-		Card:        NewCardService(deps.Store, deps.Notifier),
+		Profile:     NewProfileService(deps.Store, deps.StorageAdapter),
+		Card:        NewCardService(deps.Store, deps.Notifier, deps.StorageAdapter),
 		Bid:         NewBidService(deps.Store, deps.Notifier),
 		Order:       NewOrderService(deps.Store, deps.Notifier),
 		Dispute:     NewDisputeService(deps.Store, deps.Notifier),
 		Review:      NewReviewService(deps.Store, deps.Notifier),
+		Media:       NewMediaService(deps.Config, deps.Store, deps.StorageAdapter),
 		Payment:     NewPaymentService(deps.Store, deps.PaymentAdapter, deps.Notifier),
 		Health:      NewHealthService(deps.Config),
 		Realtime:    NewRealtimeService(deps.WorkerQueue, deps.StorageAdapter),

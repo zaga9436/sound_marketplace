@@ -1,17 +1,21 @@
 package service
 
 import (
+	"context"
+
 	"github.com/soundmarket/backend/internal/apierr"
 	"github.com/soundmarket/backend/internal/domain"
 	"github.com/soundmarket/backend/internal/repository"
+	"github.com/soundmarket/backend/internal/storage"
 )
 
 type ProfileService struct {
-	store repository.Store
+	store   repository.Store
+	storage storage.Adapter
 }
 
-func NewProfileService(store repository.Store) *ProfileService {
-	return &ProfileService{store: store}
+func NewProfileService(store repository.Store, storageAdapter storage.Adapter) *ProfileService {
+	return &ProfileService{store: store, storage: storageAdapter}
 }
 
 func (s *ProfileService) Get(userID string) (domain.Profile, error) {
@@ -32,6 +36,9 @@ func (s *ProfileService) ListCards(userID string) ([]domain.Card, error) {
 	}
 	if cards == nil {
 		return []domain.Card{}, nil
+	}
+	if err := s.attachPreviewURLs(context.Background(), cards); err != nil {
+		return nil, err
 	}
 	return cards, nil
 }
@@ -56,4 +63,18 @@ func (s *ProfileService) Update(userID, displayName, bio string) (domain.Profile
 		return domain.Profile{}, apierr.NotFound("profile not found")
 	}
 	return profile, nil
+}
+
+func (s *ProfileService) attachPreviewURLs(_ context.Context, cards []domain.Card) error {
+	for i := range cards {
+		mediaFiles, err := s.store.ListMediaByCardAndRole(cards[i].ID, domain.MediaRolePreview)
+		if err != nil {
+			return err
+		}
+		cards[i].PreviewURLs = make([]string, 0, len(mediaFiles))
+		for _, media := range mediaFiles {
+			cards[i].PreviewURLs = append(cards[i].PreviewURLs, s.storage.PublicURL(media.FileKey))
+		}
+	}
+	return nil
 }

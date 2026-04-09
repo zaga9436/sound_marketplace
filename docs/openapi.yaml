@@ -130,6 +130,12 @@ paths:
       responses:
         '200':
           description: Cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Card'
     post:
       summary: Create card
       security:
@@ -151,6 +157,10 @@ paths:
       responses:
         '200':
           description: Card
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
     put:
       summary: Update card
       security:
@@ -166,6 +176,70 @@ paths:
       responses:
         '200':
           description: Card updated
+  /cards/{id}/media/preview:
+    post:
+      summary: Upload public preview media for card
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Preview uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaFile'
+  /cards/{id}/media/full:
+    post:
+      summary: Upload private full media for card
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Full media uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaFile'
+  /cards/{id}/download:
+    get:
+      summary: Get signed URL for full card media
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Signed URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadResponse'
   /requests/{id}/bids:
     get:
       summary: List bids for request
@@ -437,11 +511,46 @@ components:
           type: array
           items:
             type: string
+        preview_urls:
+          type: array
+          items:
+            type: string
         is_published:
           type: boolean
         created_at:
           type: string
           format: date-time
+    MediaFile:
+      type: object
+      properties:
+        id:
+          type: string
+        card_id:
+          type: string
+        owner_user_id:
+          type: string
+        file_key:
+          type: string
+        original_filename:
+          type: string
+        content_type:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+        media_role:
+          type: string
+          enum: [preview, full]
+        url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    DownloadResponse:
+      type: object
+      properties:
+        url:
+          type: string
     Review:
       type: object
       properties:
