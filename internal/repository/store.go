@@ -12,6 +12,8 @@ type Store interface {
 	CreateUser(email, passwordHash string, role domain.Role) (domain.User, domain.Profile, error)
 	FindUserByEmail(email string) (domain.User, error)
 	GetUser(userID string) (domain.User, error)
+	ListUsers(role, status string) ([]domain.User, error)
+	SetUserSuspended(userID string, suspended bool, reason string) (domain.User, error)
 	GetProfile(userID string) (domain.Profile, error)
 	UpdateProfile(userID, displayName, bio string) (domain.Profile, error)
 	ListCardsByAuthor(authorID string) ([]domain.Card, error)
@@ -19,7 +21,9 @@ type Store interface {
 	CreateCard(card domain.Card) (domain.Card, error)
 	UpdateCard(cardID string, payload domain.Card) (domain.Card, error)
 	ListCards(cardType, query string) ([]domain.Card, error)
+	ListCardsForAdmin(cardType, query, visibility string) ([]domain.Card, error)
 	GetCard(cardID string) (domain.Card, error)
+	SetCardHidden(cardID string, hidden bool, reason string) (domain.Card, error)
 	CreateMedia(media domain.MediaFile) (domain.MediaFile, error)
 	ListMediaByCardAndRole(cardID string, role domain.MediaRole) ([]domain.MediaFile, error)
 	GetLatestMediaByCardAndRole(cardID string, role domain.MediaRole) (domain.MediaFile, error)
@@ -58,6 +62,8 @@ type Store interface {
 	CreateDispute(dispute domain.Dispute) (domain.Dispute, error)
 	GetDisputeByOrderID(orderID string) (domain.Dispute, error)
 	GetOpenDisputeByOrderID(orderID string) (domain.Dispute, error)
+	GetDispute(disputeID string) (domain.Dispute, error)
+	ListDisputes(status string) ([]domain.Dispute, error)
 	CloseDispute(disputeID string, resolution domain.DisputeResolution) (domain.Dispute, error)
 
 	CreateReview(review domain.Review) (domain.Review, error)
@@ -69,4 +75,6 @@ type Store interface {
 	ListNotifications(userID string, limit int, beforeID string) ([]domain.Notification, error)
 	MarkNotificationsRead(userID string, ids []string) error
 	CountUnreadNotifications(userID string) (int64, error)
+	CreateModerationAction(action domain.ModerationAction) (domain.ModerationAction, error)
+	ListModerationActions(targetType, targetID string, limit int) ([]domain.ModerationAction, error)
 }

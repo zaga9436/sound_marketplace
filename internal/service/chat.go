@@ -67,6 +67,9 @@ func (s *ChatService) ListMessages(actor domain.User, orderID, beforeID string, 
 }
 
 func (s *ChatService) SendMessage(ctx context.Context, actor domain.User, orderID, body string) (domain.ChatMessage, error) {
+	if err := ensureActiveUser(s.store, actor); err != nil {
+		return domain.ChatMessage{}, err
+	}
 	order, err := s.authorizeOrderAccess(actor, orderID)
 	if err != nil {
 		return domain.ChatMessage{}, err

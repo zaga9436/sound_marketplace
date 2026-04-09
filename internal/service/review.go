@@ -20,6 +20,9 @@ func NewReviewService(store repository.Store, notifier notifications.Service) *R
 }
 
 func (s *ReviewService) Create(actor domain.User, orderID string, rating int, text string) (domain.Review, error) {
+	if err := ensureActiveUser(s.store, actor); err != nil {
+		return domain.Review{}, err
+	}
 	text = strings.TrimSpace(text)
 	if rating < 1 || rating > 5 {
 		return domain.Review{}, apierr.BadRequest("rating must be between 1 and 5")

@@ -31,6 +31,7 @@ func New(services *service.Registry) http.Handler {
 	mediaHandler := handler.NewMediaHandler(services.Media)
 	paymentHandler := handler.NewPaymentHandler(services.Payment)
 	wsHandler := handler.NewWSHandler(services.Realtime, services.Chat)
+	adminHandler := handler.NewAdminHandler(services.Admin)
 
 	r.Get("/health", healthHandler.Get)
 
@@ -81,6 +82,21 @@ func New(services *service.Registry) http.Handler {
 			secure.Get("/payments/balance", paymentHandler.Balance)
 			secure.Get("/ws/orders/{id}", wsHandler.ConnectOrder)
 			secure.Get("/ws/notifications", wsHandler.ConnectNotifications)
+			secure.Route("/admin", func(admin chi.Router) {
+				admin.Use(middleware.RequireAdmin)
+				admin.Get("/users", adminHandler.ListUsers)
+				admin.Get("/users/{id}", adminHandler.GetUser)
+				admin.Post("/users/{id}/suspend", adminHandler.SuspendUser)
+				admin.Post("/users/{id}/unsuspend", adminHandler.UnsuspendUser)
+				admin.Get("/cards", adminHandler.ListCards)
+				admin.Get("/cards/{id}", adminHandler.GetCard)
+				admin.Post("/cards/{id}/hide", adminHandler.HideCard)
+				admin.Post("/cards/{id}/unhide", adminHandler.UnhideCard)
+				admin.Get("/disputes", adminHandler.ListDisputes)
+				admin.Get("/disputes/{id}", adminHandler.GetDispute)
+				admin.Post("/disputes/{id}/close", adminHandler.CloseDispute)
+				admin.Get("/actions", adminHandler.ListModerationActions)
+			})
 		})
 	})
 

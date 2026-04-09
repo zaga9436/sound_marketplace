@@ -33,6 +33,7 @@ type Registry struct {
 	Media       *MediaService
 	Chat        *ChatService
 	Notifications *NotificationService
+	Admin       *AdminService
 	Payment     *PaymentService
 	Health      *HealthService
 	Realtime    *RealtimeService
@@ -42,6 +43,8 @@ type Registry struct {
 func NewRegistry(deps Dependencies) *Registry {
 	chatService := NewChatService(deps.Store, deps.Broker, deps.Notifier)
 	notificationService := NewNotificationService(deps.Store, deps.Broker)
+	disputeService := NewDisputeService(deps.Store, deps.Notifier)
+	adminService := NewAdminService(deps.Store, disputeService, deps.StorageAdapter)
 
 	return &Registry{
 		Auth:        NewAuthService(deps.Store, deps.AuthManager),
@@ -49,11 +52,12 @@ func NewRegistry(deps Dependencies) *Registry {
 		Card:        NewCardService(deps.Store, deps.Notifier, deps.StorageAdapter),
 		Bid:         NewBidService(deps.Store, deps.Notifier),
 		Order:       NewOrderService(deps.Store, deps.Notifier),
-		Dispute:     NewDisputeService(deps.Store, deps.Notifier),
+		Dispute:     disputeService,
 		Review:      NewReviewService(deps.Store, deps.Notifier),
 		Media:       NewMediaService(deps.Config, deps.Store, deps.StorageAdapter),
 		Chat:        chatService,
 		Notifications: notificationService,
+		Admin:       adminService,
 		Payment:     NewPaymentService(deps.Config, deps.Store, deps.PaymentAdapter, deps.Notifier),
 		Health:      NewHealthService(deps.Config),
 		Realtime:    NewRealtimeService(deps.Broker, chatService, notificationService),

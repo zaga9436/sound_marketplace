@@ -35,6 +35,9 @@ func NewMediaService(cfg *config.Config, store repository.Store, storageAdapter 
 }
 
 func (s *MediaService) UploadCardMedia(ctx context.Context, actor domain.User, cardID string, role domain.MediaRole, input MediaUploadInput) (domain.MediaFile, error) {
+	if err := ensureActiveUser(s.store, actor); err != nil {
+		return domain.MediaFile{}, err
+	}
 	if role != domain.MediaRolePreview && role != domain.MediaRoleFull {
 		return domain.MediaFile{}, apierr.BadRequest("media_role must be preview or full")
 	}

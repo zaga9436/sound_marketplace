@@ -20,6 +20,9 @@ func NewDisputeService(store repository.Store, notifier notifications.Service) *
 }
 
 func (s *DisputeService) Open(actor domain.User, orderID, reason string) (domain.Dispute, error) {
+	if err := ensureActiveUser(s.store, actor); err != nil {
+		return domain.Dispute{}, err
+	}
 	if actor.Role == domain.RoleAdmin {
 		return domain.Dispute{}, apierr.Forbidden("admin cannot open dispute as transaction side")
 	}

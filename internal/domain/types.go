@@ -47,11 +47,14 @@ const (
 )
 
 type User struct {
-	ID           string    `json:"id"`
-	Email        string    `json:"email"`
-	PasswordHash string    `json:"-"`
-	Role         Role      `json:"role"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID               string     `json:"id"`
+	Email            string     `json:"email"`
+	PasswordHash     string     `json:"-"`
+	Role             Role       `json:"role"`
+	IsSuspended      bool       `json:"is_suspended"`
+	SuspensionReason string     `json:"suspension_reason,omitempty"`
+	SuspendedAt      *time.Time `json:"suspended_at,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
 }
 
 type Profile struct {
@@ -64,17 +67,19 @@ type Profile struct {
 }
 
 type Card struct {
-	ID          string    `json:"id"`
-	AuthorID    string    `json:"author_id"`
-	CardType    CardType  `json:"card_type"`
-	Kind        CardKind  `json:"kind"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Price       int64     `json:"price"`
-	Tags        []string  `json:"tags"`
-	PreviewURLs []string  `json:"preview_urls"`
-	IsPublished bool      `json:"is_published"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID               string    `json:"id"`
+	AuthorID         string    `json:"author_id"`
+	CardType         CardType  `json:"card_type"`
+	Kind             CardKind  `json:"kind"`
+	Title            string    `json:"title"`
+	Description      string    `json:"description"`
+	Price            int64     `json:"price"`
+	Tags             []string  `json:"tags"`
+	PreviewURLs      []string  `json:"preview_urls"`
+	IsPublished      bool      `json:"is_published"`
+	IsHidden         bool      `json:"is_hidden"`
+	ModerationReason string    `json:"moderation_reason,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
 }
 
 type Bid struct {
@@ -206,4 +211,14 @@ type Notification struct {
 	Message   string    `json:"message"`
 	IsRead    bool      `json:"is_read"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type ModerationAction struct {
+	ID          string    `json:"id"`
+	AdminUserID string    `json:"admin_user_id"`
+	TargetType  string    `json:"target_type"`
+	TargetID    string    `json:"target_id"`
+	Action      string    `json:"action"`
+	Reason      string    `json:"reason,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
 }

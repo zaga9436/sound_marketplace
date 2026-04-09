@@ -565,6 +565,250 @@ paths:
       responses:
         '101':
           description: WebSocket upgraded
+  /admin/users:
+    get:
+      summary: List users for moderation
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [customer, engineer, admin]
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, suspended]
+      responses:
+        '200':
+          description: Users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+  /admin/users/{id}:
+    get:
+      summary: Get user for moderation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /admin/users/{id}/suspend:
+    post:
+      summary: Suspend user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationReasonRequest'
+      responses:
+        '200':
+          description: Suspended user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /admin/users/{id}/unsuspend:
+    post:
+      summary: Unsuspend user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationReasonRequest'
+      responses:
+        '200':
+          description: Active user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /admin/cards:
+    get:
+      summary: List cards for moderation
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: card_type
+          schema:
+            type: string
+            enum: [offer, request]
+        - in: query
+          name: q
+          schema:
+            type: string
+        - in: query
+          name: visibility
+          schema:
+            type: string
+            enum: [visible, hidden]
+      responses:
+        '200':
+          description: Cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Card'
+  /admin/cards/{id}:
+    get:
+      summary: Get card for moderation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Card
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+  /admin/cards/{id}/hide:
+    post:
+      summary: Hide card from public listing
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationReasonRequest'
+      responses:
+        '200':
+          description: Hidden card
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+  /admin/cards/{id}/unhide:
+    post:
+      summary: Restore hidden card
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationReasonRequest'
+      responses:
+        '200':
+          description: Visible card
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Card'
+  /admin/disputes:
+    get:
+      summary: List disputes for moderation
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, closed]
+      responses:
+        '200':
+          description: Disputes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dispute'
+  /admin/disputes/{id}:
+    get:
+      summary: Get dispute for moderation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Dispute
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dispute'
+  /admin/disputes/{id}/close:
+    post:
+      summary: Close dispute as admin
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCloseDisputeRequest'
+      responses:
+        '200':
+          description: Closed dispute
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dispute'
+  /admin/actions:
+    get:
+      summary: List moderation audit trail actions
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: target_type
+          schema:
+            type: string
+            enum: [user, card, dispute]
+        - in: query
+          name: target_id
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Moderation actions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ModerationAction'
 components:
   securitySchemes:
     bearerAuth:
@@ -618,6 +862,13 @@ components:
           type: string
         role:
           type: string
+        is_suspended:
+          type: boolean
+        suspension_reason:
+          type: string
+        suspended_at:
+          type: string
+          format: date-time
     Profile:
       type: object
       properties:
@@ -662,6 +913,10 @@ components:
             type: string
         is_published:
           type: boolean
+        is_hidden:
+          type: boolean
+        moderation_reason:
+          type: string
         created_at:
           type: string
           format: date-time
@@ -834,6 +1089,29 @@ components:
           type: string
         message:
           type: string
+    Dispute:
+      type: object
+      properties:
+        id:
+          type: string
+        order_id:
+          type: string
+        opened_by_user_id:
+          type: string
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [open, closed]
+        resolution:
+          type: string
+          enum: [complete_order, cancel_order]
+        created_at:
+          type: string
+          format: date-time
+        closed_at:
+          type: string
+          format: date-time
     CloseDisputeRequest:
       type: object
       required: [resolution]
@@ -842,6 +1120,22 @@ components:
           type: string
           enum: [complete_order, cancel_order]
         message:
+          type: string
+    AdminCloseDisputeRequest:
+      type: object
+      required: [resolution]
+      properties:
+        resolution:
+          type: string
+          enum: [complete_order, cancel_order]
+        reason:
+          type: string
+        message:
+          type: string
+    ModerationReasonRequest:
+      type: object
+      properties:
+        reason:
           type: string
     DepositRequest:
       type: object
@@ -923,3 +1217,22 @@ components:
           type: array
           items:
             type: string
+    ModerationAction:
+      type: object
+      properties:
+        id:
+          type: string
+        admin_user_id:
+          type: string
+        target_type:
+          type: string
+          enum: [user, card, dispute]
+        target_id:
+          type: string
+        action:
+          type: string
+        reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time

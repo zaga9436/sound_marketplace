@@ -19,6 +19,9 @@ func NewOrderService(store repository.Store, notifier notifications.Service) *Or
 }
 
 func (s *OrderService) CreateFromOffer(customer domain.User, cardID string) (domain.Order, error) {
+	if err := ensureActiveUser(s.store, customer); err != nil {
+		return domain.Order{}, err
+	}
 	if customer.Role != domain.RoleCustomer {
 		return domain.Order{}, apierr.Forbidden("only customer can create order")
 	}
@@ -76,6 +79,9 @@ func (s *OrderService) CreateFromOffer(customer domain.User, cardID string) (dom
 }
 
 func (s *OrderService) CreateFromBid(customer domain.User, bidID string) (domain.Order, error) {
+	if err := ensureActiveUser(s.store, customer); err != nil {
+		return domain.Order{}, err
+	}
 	if customer.Role != domain.RoleCustomer {
 		return domain.Order{}, apierr.Forbidden("only customer can accept bid")
 	}

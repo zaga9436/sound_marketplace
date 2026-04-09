@@ -20,6 +20,9 @@ func NewBidService(store repository.Store, notifier notifications.Service) *BidS
 }
 
 func (s *BidService) Create(actor domain.User, requestID string, price int64, message string) (domain.Bid, error) {
+	if err := ensureActiveUser(s.store, actor); err != nil {
+		return domain.Bid{}, err
+	}
 	if actor.Role != domain.RoleEngineer {
 		return domain.Bid{}, apierr.Forbidden("only engineer can submit bids")
 	}

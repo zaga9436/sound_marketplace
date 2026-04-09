@@ -64,11 +64,13 @@ func (s *PostgresStore) CreateUser(email, passwordHash string, role domain.Role)
 		ps := txStore.(*PostgresStore)
 		now := time.Now().UTC()
 		user = domain.User{
-			ID:           uuid.NewString(),
-			Email:        strings.ToLower(email),
-			PasswordHash: passwordHash,
-			Role:         role,
-			CreatedAt:    now,
+			ID:               uuid.NewString(),
+			Email:            strings.ToLower(email),
+			PasswordHash:     passwordHash,
+			Role:             role,
+			IsSuspended:      false,
+			SuspensionReason: "",
+			CreatedAt:        now,
 		}
 		profile = domain.Profile{
 			UserID:       user.ID,
@@ -80,8 +82,8 @@ func (s *PostgresStore) CreateUser(email, passwordHash string, role domain.Role)
 		}
 
 		if _, err := ps.runner().Exec(
-			`INSERT INTO users (id, email, password_hash, role, created_at) VALUES ($1, $2, $3, $4, $5)`,
-			user.ID, user.Email, user.PasswordHash, string(user.Role), user.CreatedAt,
+			`INSERT INTO users (id, email, password_hash, role, is_suspended, suspension_reason, suspended_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, NULL, $7)`,
+			user.ID, user.Email, user.PasswordHash, string(user.Role), user.IsSuspended, user.SuspensionReason, user.CreatedAt,
 		); err != nil {
 			return err
 		}
@@ -99,16 +101,74 @@ func (s *PostgresStore) CreateUser(email, passwordHash string, role domain.Role)
 
 func (s *PostgresStore) FindUserByEmail(email string) (domain.User, error) {
 	return s.scanUser(s.runner().QueryRow(
-		`SELECT id, email, password_hash, role, created_at FROM users WHERE email = $1`,
+		`SELECT id, email, password_hash, role, is_suspended, suspension_reason, suspended_at, created_at FROM users WHERE email = $1`,
 		strings.ToLower(email),
 	))
 }
 
 func (s *PostgresStore) GetUser(userID string) (domain.User, error) {
 	return s.scanUser(s.runner().QueryRow(
-		`SELECT id, email, password_hash, role, created_at FROM users WHERE id = $1`,
+		`SELECT id, email, password_hash, role, is_suspended, suspension_reason, suspended_at, created_at FROM users WHERE id = $1`,
 		userID,
 	))
+}
+
+func (s *PostgresStore) ListUsers(role, status string) ([]domain.User, error) {
+	base := `SELECT id, email, password_hash, role, is_suspended, suspension_reason, suspended_at, created_at FROM users`
+	args := make([]interface{}, 0, 2)
+	conditions := make([]string, 0, 2)
+	if role != "" {
+		args = append(args, role)
+		conditions = append(conditions, fmt.Sprintf("role = $%d", len(args)))
+	}
+	if status == "suspended" {
+		conditions = append(conditions, "is_suspended = TRUE")
+	} else if status == "active" {
+		conditions = append(conditions, "is_suspended = FALSE")
+	}
+	if len(conditions) > 0 {
+		base += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	base += " ORDER BY created_at DESC"
+	rows, err := s.runner().Query(base, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	users := make([]domain.User, 0)
+	for rows.Next() {
+		var user domain.User
+		var roleValue string
+		var suspendedAt sql.NullTime
+		if err := rows.Scan(&user.ID, &user.Email, &user.PasswordHash, &roleValue, &user.IsSuspended, &user.SuspensionReason, &suspendedAt, &user.CreatedAt); err != nil {
+			return nil, err
+		}
+		user.Role = domain.Role(roleValue)
+		if suspendedAt.Valid {
+			t := suspendedAt.Time
+			user.SuspendedAt = &t
+		}
+		users = append(users, user)
+	}
+	return users, rows.Err()
+}
+
+func (s *PostgresStore) SetUserSuspended(userID string, suspended bool, reason string) (domain.User, error) {
+	var suspendedAt interface{}
+	if suspended {
+		suspendedAt = time.Now().UTC()
+	} else {
+		reason = ""
+		suspendedAt = nil
+	}
+	_, err := s.runner().Exec(
+		`UPDATE users SET is_suspended = $2, suspension_reason = $3, suspended_at = $4 WHERE id = $1`,
+		userID, suspended, reason, suspendedAt,
+	)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return s.GetUser(userID)
 }
 
 func (s *PostgresStore) GetProfile(userID string) (domain.Profile, error) {
@@ -139,9 +199,9 @@ func (s *PostgresStore) UpdateProfile(userID, displayName, bio string) (domain.P
 
 func (s *PostgresStore) ListCardsByAuthor(authorID string) ([]domain.Card, error) {
 	rows, err := s.runner().Query(
-		`SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, created_at
+		`SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, is_hidden, moderation_reason, created_at
 		 FROM cards
-		 WHERE author_id = $1
+		 WHERE author_id = $1 AND is_hidden = FALSE
 		 ORDER BY created_at DESC`,
 		authorID,
 	)
@@ -153,7 +213,7 @@ func (s *PostgresStore) ListCardsByAuthor(authorID string) ([]domain.Card, error
 	cards := make([]domain.Card, 0)
 	for rows.Next() {
 		var card domain.Card
-		if err := rows.Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.CreatedAt); err != nil {
+		if err := rows.Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.IsHidden, &card.ModerationReason, &card.CreatedAt); err != nil {
 			return nil, err
 		}
 		cards = append(cards, card)
@@ -168,9 +228,9 @@ func (s *PostgresStore) CreateCard(card domain.Card) (domain.Card, error) {
 	card.ID = uuid.NewString()
 	card.CreatedAt = time.Now().UTC()
 	_, err := s.runner().Exec(
-		`INSERT INTO cards (id, author_id, card_type, kind, title, description, price, tags, is_published, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
-		card.ID, card.AuthorID, string(card.CardType), string(card.Kind), card.Title, card.Description, card.Price, pq.Array(card.Tags), card.IsPublished, card.CreatedAt,
+		`INSERT INTO cards (id, author_id, card_type, kind, title, description, price, tags, is_published, is_hidden, moderation_reason, created_at, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12)`,
+		card.ID, card.AuthorID, string(card.CardType), string(card.Kind), card.Title, card.Description, card.Price, pq.Array(card.Tags), card.IsPublished, card.IsHidden, card.ModerationReason, card.CreatedAt,
 	)
 	if err != nil {
 		return domain.Card{}, err
@@ -193,9 +253,10 @@ func (s *PostgresStore) UpdateCard(cardID string, payload domain.Card) (domain.C
 }
 
 func (s *PostgresStore) ListCards(cardType, query string) ([]domain.Card, error) {
-	base := `SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, created_at FROM cards`
+	base := `SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, is_hidden, moderation_reason, created_at FROM cards`
 	args := make([]interface{}, 0, 2)
-	conditions := make([]string, 0, 2)
+	conditions := make([]string, 0, 3)
+	conditions = append(conditions, "is_hidden = FALSE")
 
 	if cardType != "" {
 		args = append(args, cardType)
@@ -219,7 +280,7 @@ func (s *PostgresStore) ListCards(cardType, query string) ([]domain.Card, error)
 	var cards []domain.Card
 	for rows.Next() {
 		var card domain.Card
-		if err := rows.Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.CreatedAt); err != nil {
+		if err := rows.Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.IsHidden, &card.ModerationReason, &card.CreatedAt); err != nil {
 			return nil, err
 		}
 		cards = append(cards, card)
@@ -233,9 +294,9 @@ func (s *PostgresStore) ListCards(cardType, query string) ([]domain.Card, error)
 func (s *PostgresStore) GetCard(cardID string) (domain.Card, error) {
 	var card domain.Card
 	err := s.runner().QueryRow(
-		`SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, created_at FROM cards WHERE id = $1`,
+		`SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, is_hidden, moderation_reason, created_at FROM cards WHERE id = $1`,
 		cardID,
-	).Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.CreatedAt)
+	).Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.IsHidden, &card.ModerationReason, &card.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Card{}, ErrNotFound
@@ -243,6 +304,57 @@ func (s *PostgresStore) GetCard(cardID string) (domain.Card, error) {
 		return domain.Card{}, err
 	}
 	return card, nil
+}
+
+func (s *PostgresStore) ListCardsForAdmin(cardType, query, visibility string) ([]domain.Card, error) {
+	base := `SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, is_hidden, moderation_reason, created_at FROM cards`
+	args := make([]interface{}, 0, 3)
+	conditions := make([]string, 0, 3)
+	if cardType != "" {
+		args = append(args, cardType)
+		conditions = append(conditions, fmt.Sprintf("card_type = $%d", len(args)))
+	}
+	if query != "" {
+		args = append(args, "%"+strings.ToLower(query)+"%")
+		conditions = append(conditions, fmt.Sprintf("(LOWER(title) LIKE $%d OR LOWER(description) LIKE $%d)", len(args), len(args)))
+	}
+	if visibility == "hidden" {
+		conditions = append(conditions, "is_hidden = TRUE")
+	} else if visibility == "visible" {
+		conditions = append(conditions, "is_hidden = FALSE")
+	}
+	if len(conditions) > 0 {
+		base += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	base += " ORDER BY created_at DESC"
+	rows, err := s.runner().Query(base, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	cards := make([]domain.Card, 0)
+	for rows.Next() {
+		var card domain.Card
+		if err := rows.Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.IsHidden, &card.ModerationReason, &card.CreatedAt); err != nil {
+			return nil, err
+		}
+		cards = append(cards, card)
+	}
+	return cards, rows.Err()
+}
+
+func (s *PostgresStore) SetCardHidden(cardID string, hidden bool, reason string) (domain.Card, error) {
+	if !hidden {
+		reason = ""
+	}
+	_, err := s.runner().Exec(
+		`UPDATE cards SET is_hidden = $2, moderation_reason = $3, updated_at = NOW() WHERE id = $1`,
+		cardID, hidden, reason,
+	)
+	if err != nil {
+		return domain.Card{}, err
+	}
+	return s.GetCard(cardID)
 }
 
 func (s *PostgresStore) CreateMedia(media domain.MediaFile) (domain.MediaFile, error) {
@@ -764,12 +876,53 @@ func (s *PostgresStore) GetDisputeByOrderID(orderID string) (domain.Dispute, err
 	))
 }
 
+func (s *PostgresStore) GetDispute(disputeID string) (domain.Dispute, error) {
+	return s.scanDispute(s.runner().QueryRow(
+		`SELECT id, order_id, opened_by, reason, status, resolution, created_at, resolved_at
+		 FROM disputes WHERE id = $1`,
+		disputeID,
+	))
+}
+
 func (s *PostgresStore) GetOpenDisputeByOrderID(orderID string) (domain.Dispute, error) {
 	return s.scanDispute(s.runner().QueryRow(
 		`SELECT id, order_id, opened_by, reason, status, resolution, created_at, resolved_at
 		 FROM disputes WHERE order_id = $1 AND status = 'open' ORDER BY created_at DESC LIMIT 1`,
 		orderID,
 	))
+}
+
+func (s *PostgresStore) ListDisputes(status string) ([]domain.Dispute, error) {
+	base := `SELECT id, order_id, opened_by, reason, status, resolution, created_at, resolved_at FROM disputes`
+	args := make([]interface{}, 0, 1)
+	if status != "" {
+		args = append(args, status)
+		base += " WHERE status = $1"
+	}
+	base += " ORDER BY created_at DESC"
+	rows, err := s.runner().Query(base, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	disputes := make([]domain.Dispute, 0)
+	for rows.Next() {
+		var dispute domain.Dispute
+		var statusValue string
+		var resolution string
+		var closedAt sql.NullTime
+		if err := rows.Scan(&dispute.ID, &dispute.OrderID, &dispute.OpenedByUserID, &dispute.Reason, &statusValue, &resolution, &dispute.CreatedAt, &closedAt); err != nil {
+			return nil, err
+		}
+		dispute.Status = domain.DisputeStatus(statusValue)
+		dispute.Resolution = domain.DisputeResolution(resolution)
+		if closedAt.Valid {
+			t := closedAt.Time
+			dispute.ClosedAt = &t
+		}
+		disputes = append(disputes, dispute)
+	}
+	return disputes, rows.Err()
 }
 
 func (s *PostgresStore) CloseDispute(disputeID string, resolution domain.DisputeResolution) (domain.Dispute, error) {
@@ -945,10 +1098,61 @@ func (s *PostgresStore) CountUnreadNotifications(userID string) (int64, error) {
 	return count, err
 }
 
+func (s *PostgresStore) CreateModerationAction(action domain.ModerationAction) (domain.ModerationAction, error) {
+	action.ID = uuid.NewString()
+	action.CreatedAt = time.Now().UTC()
+	_, err := s.runner().Exec(
+		`INSERT INTO moderation_actions (id, admin_user_id, target_type, target_id, action, reason, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		action.ID, action.AdminUserID, action.TargetType, action.TargetID, action.Action, action.Reason, action.CreatedAt,
+	)
+	if err != nil {
+		return domain.ModerationAction{}, err
+	}
+	return action, nil
+}
+
+func (s *PostgresStore) ListModerationActions(targetType, targetID string, limit int) ([]domain.ModerationAction, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	base := `SELECT id, admin_user_id, target_type, target_id, action, reason, created_at FROM moderation_actions`
+	args := make([]interface{}, 0, 3)
+	conditions := make([]string, 0, 2)
+	if targetType != "" {
+		args = append(args, targetType)
+		conditions = append(conditions, fmt.Sprintf("target_type = $%d", len(args)))
+	}
+	if targetID != "" {
+		args = append(args, targetID)
+		conditions = append(conditions, fmt.Sprintf("target_id = $%d", len(args)))
+	}
+	if len(conditions) > 0 {
+		base += " WHERE " + strings.Join(conditions, " AND ")
+	}
+	args = append(args, limit)
+	base += fmt.Sprintf(" ORDER BY created_at DESC LIMIT $%d", len(args))
+	rows, err := s.runner().Query(base, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	actions := make([]domain.ModerationAction, 0)
+	for rows.Next() {
+		var action domain.ModerationAction
+		if err := rows.Scan(&action.ID, &action.AdminUserID, &action.TargetType, &action.TargetID, &action.Action, &action.Reason, &action.CreatedAt); err != nil {
+			return nil, err
+		}
+		actions = append(actions, action)
+	}
+	return actions, rows.Err()
+}
+
 func (s *PostgresStore) scanUser(row *sql.Row) (domain.User, error) {
 	var user domain.User
 	var role string
-	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &role, &user.CreatedAt)
+	var suspendedAt sql.NullTime
+	err := row.Scan(&user.ID, &user.Email, &user.PasswordHash, &role, &user.IsSuspended, &user.SuspensionReason, &suspendedAt, &user.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.User{}, ErrNotFound
@@ -956,6 +1160,10 @@ func (s *PostgresStore) scanUser(row *sql.Row) (domain.User, error) {
 		return domain.User{}, err
 	}
 	user.Role = domain.Role(role)
+	if suspendedAt.Valid {
+		t := suspendedAt.Time
+		user.SuspendedAt = &t
+	}
 	return user, nil
 }
 

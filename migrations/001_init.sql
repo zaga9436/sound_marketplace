@@ -3,6 +3,9 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('customer', 'engineer', 'admin')),
+    is_suspended BOOLEAN NOT NULL DEFAULT FALSE,
+    suspension_reason TEXT NOT NULL DEFAULT '',
+    suspended_at TIMESTAMPTZ NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -26,6 +29,8 @@ CREATE TABLE IF NOT EXISTS cards (
     price BIGINT NOT NULL CHECK (price >= 0),
     tags TEXT[] NOT NULL DEFAULT '{}',
     is_published BOOLEAN NOT NULL DEFAULT TRUE,
+    is_hidden BOOLEAN NOT NULL DEFAULT FALSE,
+    moderation_reason TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -148,3 +153,18 @@ CREATE TABLE IF NOT EXISTS disputes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     resolved_at TIMESTAMPTZ NULL
 );
+
+CREATE TABLE IF NOT EXISTS moderation_actions (
+    id TEXT PRIMARY KEY,
+    admin_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_role_suspended ON users(role, is_suspended);
+CREATE INDEX IF NOT EXISTS idx_cards_hidden_created_at ON cards(is_hidden, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_disputes_status_created_at ON disputes(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_moderation_actions_target ON moderation_actions(target_type, target_id, created_at DESC);

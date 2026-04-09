@@ -22,6 +22,9 @@ func NewCardService(store repository.Store, notifier notifications.Service, stor
 }
 
 func (s *CardService) Create(actor domain.User, payload domain.Card) (domain.Card, error) {
+	if err := ensureActiveUser(s.store, actor); err != nil {
+		return domain.Card{}, err
+	}
 	if payload.CardType != domain.CardTypeOffer && payload.CardType != domain.CardTypeRequest {
 		return domain.Card{}, apierr.BadRequest("card_type must be offer or request")
 	}
@@ -96,6 +99,9 @@ func (s *CardService) List(cardType, query string) ([]domain.Card, error) {
 func (s *CardService) Get(cardID string) (domain.Card, error) {
 	card, err := s.store.GetCard(cardID)
 	if err != nil {
+		return domain.Card{}, apierr.NotFound("card not found")
+	}
+	if card.IsHidden {
 		return domain.Card{}, apierr.NotFound("card not found")
 	}
 	cards := []domain.Card{card}
