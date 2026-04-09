@@ -112,15 +112,16 @@ type Transaction struct {
 }
 
 type Payment struct {
-	ID           string    `json:"id"`
-	UserID       string    `json:"user_id"`
-	ExternalID   string    `json:"external_id"`
-	Amount       int64     `json:"amount"`
-	Status       string    `json:"status"`
-	Provider     string    `json:"provider"`
-	RedirectURL  string    `json:"redirect_url"`
-	CallbackData string    `json:"callback_data,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID              string    `json:"id"`
+	UserID          string    `json:"user_id"`
+	ExternalID      string    `json:"external_id"`
+	Amount          int64     `json:"amount"`
+	Status          string    `json:"status"`
+	Provider        string    `json:"provider"`
+	RedirectURL     string    `json:"redirect_url"`
+	ConfirmationURL string    `json:"confirmation_url,omitempty"`
+	CallbackData    string    `json:"callback_data,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type DisputeStatus string

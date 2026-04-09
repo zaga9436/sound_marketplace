@@ -552,6 +552,7 @@ func (s *PostgresStore) GetPaymentByExternalID(externalID string) (domain.Paymen
 		}
 		return domain.Payment{}, err
 	}
+	payment.ConfirmationURL = payment.RedirectURL
 	return payment, nil
 }
 

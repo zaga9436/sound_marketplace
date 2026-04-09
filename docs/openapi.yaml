@@ -378,7 +378,7 @@ paths:
           description: Dispute closed
   /payments/deposits:
     post:
-      summary: Create mock deposit payment
+      summary: Create external deposit payment session
       security:
         - bearerAuth: []
       requestBody:
@@ -389,19 +389,45 @@ paths:
               $ref: '#/components/schemas/DepositRequest'
       responses:
         '201':
-          description: Deposit created
+          description: Payment session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
   /payments/webhook:
     post:
-      summary: Mark mock YooKassa payment as succeeded and create internal deposit transaction
+      summary: Process provider webhook and create deposit in internal ledger on succeeded payment
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PaymentWebhookRequest'
+              type: object
       responses:
         '200':
           description: Payment processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentWebhookResponse'
+  /payments/sync:
+    post:
+      summary: Dev-only manual sync of YooKassa payment status into internal ledger
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentSyncRequest'
+      responses:
+        '200':
+          description: Payment sync processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentWebhookResponse'
   /payments/balance:
     get:
       summary: Get internal balance
@@ -661,7 +687,41 @@ components:
         amount:
           type: integer
           format: int64
-    PaymentWebhookRequest:
+          description: Deposit amount in whole RUB
+    Payment:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        external_id:
+          type: string
+        amount:
+          type: integer
+          format: int64
+          description: Amount in whole RUB
+        status:
+          type: string
+        provider:
+          type: string
+        redirect_url:
+          type: string
+        confirmation_url:
+          type: string
+        callback_data:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    PaymentWebhookResponse:
+      type: object
+      properties:
+        payment:
+          $ref: '#/components/schemas/Payment'
+        deposit_created:
+          type: boolean
+    PaymentSyncRequest:
       type: object
       required: [external_id]
       properties:

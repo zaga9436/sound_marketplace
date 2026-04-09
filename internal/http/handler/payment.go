@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"io"
 	"net/http"
 
 	httprequest "github.com/soundmarket/backend/internal/http/request"
@@ -17,7 +18,7 @@ type depositRequest struct {
 	Amount int64 `json:"amount"`
 }
 
-type webhookRequest struct {
+type syncPaymentRequest struct {
 	ExternalID string `json:"external_id"`
 }
 
@@ -41,17 +42,35 @@ func (h *PaymentHandler) CreateDeposit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PaymentHandler) Webhook(w http.ResponseWriter, r *http.Request) {
-	var req webhookRequest
-	if err := httprequest.DecodeJSON(r, &req); err != nil {
-		response.Error(w, http.StatusBadRequest, "invalid json")
+	payload, err := io.ReadAll(r.Body)
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid webhook body")
 		return
 	}
-	tx, err := h.service.ProcessWebhook(req.ExternalID)
+	payment, created, err := h.service.ProcessWebhook(r.Context(), payload, r.Header)
 	if err != nil {
 		response.FromError(w, err)
 		return
 	}
-	response.JSON(w, http.StatusOK, tx)
+	response.JSON(w, http.StatusOK, map[string]interface{}{
+		"payment":          payment,
+		"deposit_created": created,
+	})
+}
+
+func (h *PaymentHandler) Sync(w http.ResponseWriter, r *http.Request) {
+	user := middleware.CurrentUser(r)
+	var req syncPaymentRequest
+	if err := httprequest.DecodeJSON(r, &req); err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	result, err := h.service.SyncPayment(r.Context(), user, req.ExternalID)
+	if err != nil {
+		response.FromError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, result)
 }
 
 func (h *PaymentHandler) Balance(w http.ResponseWriter, r *http.Request) {

@@ -69,6 +69,7 @@ func New(services *service.Registry) http.Handler {
 				})
 			})
 			secure.Post("/payments/deposits", paymentHandler.CreateDeposit)
+			secure.Post("/payments/sync", paymentHandler.Sync)
 			secure.Get("/payments/balance", paymentHandler.Balance)
 			secure.Get("/ws/orders/{id}", wsHandler.Connect)
 		})

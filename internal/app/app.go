@@ -2,8 +2,10 @@ package app
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/soundmarket/backend/internal/auth"
@@ -60,7 +62,17 @@ func New() (*App, error) {
 		_ = redisClient.Close()
 		return nil, err
 	}
-	paymentAdapter := payments.NewMockYooKassaAdapter(cfg)
+	var paymentAdapter payments.Provider
+	switch strings.ToLower(cfg.PaymentProvider) {
+	case "", "mock":
+		paymentAdapter = payments.NewMockProvider(cfg)
+	case "yookassa":
+		paymentAdapter = payments.NewYooKassaProvider(cfg)
+	default:
+		_ = postgresDB.Close()
+		_ = redisClient.Close()
+		return nil, fmt.Errorf("unsupported PAYMENT_PROVIDER: %s", cfg.PaymentProvider)
+	}
 	notifier := notifications.NewRepositoryBackedService(store)
 	workerQueue := worker.NewInMemoryQueue()
 

@@ -15,7 +15,7 @@ type Dependencies struct {
 	Store          repository.Store
 	AuthManager    *auth.JWTManager
 	StorageAdapter storage.Adapter
-	PaymentAdapter payments.Adapter
+	PaymentAdapter payments.Provider
 	Notifier       notifications.Service
 	WorkerQueue    worker.Queue
 }
@@ -45,7 +45,7 @@ func NewRegistry(deps Dependencies) *Registry {
 		Dispute:     NewDisputeService(deps.Store, deps.Notifier),
 		Review:      NewReviewService(deps.Store, deps.Notifier),
 		Media:       NewMediaService(deps.Config, deps.Store, deps.StorageAdapter),
-		Payment:     NewPaymentService(deps.Store, deps.PaymentAdapter, deps.Notifier),
+		Payment:     NewPaymentService(deps.Config, deps.Store, deps.PaymentAdapter, deps.Notifier),
 		Health:      NewHealthService(deps.Config),
 		Realtime:    NewRealtimeService(deps.WorkerQueue, deps.StorageAdapter),
 		AuthManager: deps.AuthManager,

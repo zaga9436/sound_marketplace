@@ -29,6 +29,7 @@ type Config struct {
 	RedisPassword         string
 	JWTSecret             string
 	JWTTTL                time.Duration
+	PaymentProvider       string
 	S3Endpoint            string
 	S3Region              string
 	S3Bucket              string
@@ -96,6 +97,7 @@ func Load() (*Config, error) {
 		RedisPort:           required["REDIS_PORT"],
 		RedisPassword:       os.Getenv("REDIS_PASSWORD"),
 		JWTSecret:           required["JWT_SECRET"],
+		PaymentProvider:     strings.ToLower(getWithDefault("PAYMENT_PROVIDER", "mock")),
 		S3Endpoint:          required["S3_ENDPOINT"],
 		S3Region:            required["S3_REGION"],
 		S3Bucket:            required["S3_BUCKET"],
