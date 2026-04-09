@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     display_name TEXT NOT NULL,
     bio TEXT NOT NULL DEFAULT '',
     rating DOUBLE PRECISION NOT NULL DEFAULT 0,
+    reviews_count INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -122,6 +123,8 @@ CREATE TABLE IF NOT EXISTS reviews (
     comment TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_order_author_unique ON reviews(order_id, author_id) WHERE order_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS disputes (
     id TEXT PRIMARY KEY,

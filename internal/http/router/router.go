@@ -25,6 +25,7 @@ func New(services *service.Registry) http.Handler {
 	bidHandler := handler.NewBidHandler(services.Bid)
 	orderHandler := handler.NewOrderHandler(services.Order)
 	disputeHandler := handler.NewDisputeHandler(services.Dispute)
+	reviewHandler := handler.NewReviewHandler(services.Review)
 	paymentHandler := handler.NewPaymentHandler(services.Payment)
 	wsHandler := handler.NewWSHandler(services.Realtime)
 
@@ -36,6 +37,8 @@ func New(services *service.Registry) http.Handler {
 		api.Get("/cards", cardHandler.List)
 		api.Get("/cards/{id}", cardHandler.Get)
 		api.Get("/profiles/{id}", profileHandler.Public)
+		api.Get("/profiles/{id}/cards", profileHandler.Cards)
+		api.Get("/profiles/{id}/reviews", profileHandler.Reviews)
 		api.Post("/payments/webhook", paymentHandler.Webhook)
 
 		api.Group(func(secure chi.Router) {
@@ -55,6 +58,7 @@ func New(services *service.Registry) http.Handler {
 				orderRoutes.Route("/{id}", func(order chi.Router) {
 					order.Get("/", orderHandler.Get)
 					order.Patch("/status", orderHandler.UpdateStatus)
+					order.Post("/reviews", reviewHandler.Create)
 					order.Post("/dispute", disputeHandler.Open)
 					order.Get("/dispute", disputeHandler.Get)
 					order.Post("/dispute/close", disputeHandler.Close)

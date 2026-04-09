@@ -71,11 +71,12 @@ func (s *PostgresStore) CreateUser(email, passwordHash string, role domain.Role)
 			CreatedAt:    now,
 		}
 		profile = domain.Profile{
-			UserID:      user.ID,
-			DisplayName: strings.Split(user.Email, "@")[0],
-			Bio:         "",
-			Rating:      0,
-			CreatedAt:   now,
+			UserID:       user.ID,
+			DisplayName:  strings.Split(user.Email, "@")[0],
+			Bio:          "",
+			Rating:       0,
+			ReviewsCount: 0,
+			CreatedAt:    now,
 		}
 
 		if _, err := ps.runner().Exec(
@@ -85,8 +86,8 @@ func (s *PostgresStore) CreateUser(email, passwordHash string, role domain.Role)
 			return err
 		}
 		if _, err := ps.runner().Exec(
-			`INSERT INTO profiles (user_id, display_name, bio, rating, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $5)`,
-			profile.UserID, profile.DisplayName, profile.Bio, profile.Rating, profile.CreatedAt,
+			`INSERT INTO profiles (user_id, display_name, bio, rating, reviews_count, created_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6, $6)`,
+			profile.UserID, profile.DisplayName, profile.Bio, profile.Rating, profile.ReviewsCount, profile.CreatedAt,
 		); err != nil {
 			return err
 		}
@@ -113,9 +114,9 @@ func (s *PostgresStore) GetUser(userID string) (domain.User, error) {
 func (s *PostgresStore) GetProfile(userID string) (domain.Profile, error) {
 	var profile domain.Profile
 	err := s.runner().QueryRow(
-		`SELECT user_id, display_name, bio, rating, created_at FROM profiles WHERE user_id = $1`,
+		`SELECT user_id, display_name, bio, rating, reviews_count, created_at FROM profiles WHERE user_id = $1`,
 		userID,
-	).Scan(&profile.UserID, &profile.DisplayName, &profile.Bio, &profile.Rating, &profile.CreatedAt)
+	).Scan(&profile.UserID, &profile.DisplayName, &profile.Bio, &profile.Rating, &profile.ReviewsCount, &profile.CreatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.Profile{}, ErrNotFound
@@ -134,6 +135,30 @@ func (s *PostgresStore) UpdateProfile(userID, displayName, bio string) (domain.P
 		return domain.Profile{}, err
 	}
 	return s.GetProfile(userID)
+}
+
+func (s *PostgresStore) ListCardsByAuthor(authorID string) ([]domain.Card, error) {
+	rows, err := s.runner().Query(
+		`SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, created_at
+		 FROM cards
+		 WHERE author_id = $1
+		 ORDER BY created_at DESC`,
+		authorID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	cards := make([]domain.Card, 0)
+	for rows.Next() {
+		var card domain.Card
+		if err := rows.Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.CreatedAt); err != nil {
+			return nil, err
+		}
+		cards = append(cards, card)
+	}
+	return cards, rows.Err()
 }
 
 func (s *PostgresStore) CreateCard(card domain.Card) (domain.Card, error) {
@@ -513,6 +538,85 @@ func (s *PostgresStore) CloseDispute(disputeID string, resolution domain.Dispute
 	))
 }
 
+func (s *PostgresStore) CreateReview(review domain.Review) (domain.Review, error) {
+	review.ID = uuid.NewString()
+	review.CreatedAt = time.Now().UTC()
+	_, err := s.runner().Exec(
+		`INSERT INTO reviews (id, order_id, author_id, target_user_id, rating, comment, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		review.ID, review.OrderID, review.AuthorID, review.TargetUserID, review.Rating, review.Text, review.CreatedAt,
+	)
+	if err != nil {
+		return domain.Review{}, err
+	}
+	return review, nil
+}
+
+func (s *PostgresStore) GetReviewByOrderAndAuthor(orderID, authorID string) (domain.Review, error) {
+	return s.scanReview(s.runner().QueryRow(
+		`SELECT id, order_id, author_id, target_user_id, rating, comment, created_at
+		 FROM reviews
+		 WHERE order_id = $1 AND author_id = $2
+		 ORDER BY created_at DESC
+		 LIMIT 1`,
+		orderID, authorID,
+	))
+}
+
+func (s *PostgresStore) ListReviewsByTargetUser(targetUserID string) ([]domain.Review, error) {
+	rows, err := s.runner().Query(
+		`SELECT id, order_id, author_id, target_user_id, rating, comment, created_at
+		 FROM reviews
+		 WHERE target_user_id = $1
+		 ORDER BY created_at DESC`,
+		targetUserID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	reviews := make([]domain.Review, 0)
+	for rows.Next() {
+		var review domain.Review
+		if err := rows.Scan(&review.ID, &review.OrderID, &review.AuthorID, &review.TargetUserID, &review.Rating, &review.Text, &review.CreatedAt); err != nil {
+			return nil, err
+		}
+		reviews = append(reviews, review)
+	}
+	return reviews, rows.Err()
+}
+
+func (s *PostgresStore) RefreshProfileRating(userID string) (domain.Profile, error) {
+	_, err := s.runner().Exec(
+		`UPDATE profiles
+		 SET rating = COALESCE(agg.avg_rating, 0),
+		     reviews_count = COALESCE(agg.reviews_count, 0),
+		     updated_at = NOW()
+		 FROM (
+		     SELECT target_user_id, AVG(rating)::double precision AS avg_rating, COUNT(*)::int AS reviews_count
+		     FROM reviews
+		     WHERE target_user_id = $1
+		     GROUP BY target_user_id
+		 ) AS agg
+		 WHERE profiles.user_id = $1`,
+		userID,
+	)
+	if err != nil {
+		return domain.Profile{}, err
+	}
+	if _, err := s.runner().Exec(
+		`UPDATE profiles
+		 SET rating = 0, reviews_count = 0, updated_at = NOW()
+		 WHERE user_id = $1
+		   AND NOT EXISTS (SELECT 1 FROM reviews WHERE target_user_id = $1)`,
+		userID,
+	); err != nil {
+		return domain.Profile{}, err
+	}
+	return s.GetProfile(userID)
+}
+
 func (s *PostgresStore) CreateNotification(userID, eventType, message string) error {
 	_, err := s.runner().Exec(
 		`INSERT INTO notifications (id, user_id, type, message, is_read, created_at) VALUES ($1, $2, $3, $4, FALSE, $5)`,
@@ -590,6 +694,26 @@ func (s *PostgresStore) scanDispute(row *sql.Row) (domain.Dispute, error) {
 		dispute.ClosedAt = &t
 	}
 	return dispute, nil
+}
+
+func (s *PostgresStore) scanReview(row *sql.Row) (domain.Review, error) {
+	var review domain.Review
+	err := row.Scan(
+		&review.ID,
+		&review.OrderID,
+		&review.AuthorID,
+		&review.TargetUserID,
+		&review.Rating,
+		&review.Text,
+		&review.CreatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.Review{}, ErrNotFound
+		}
+		return domain.Review{}, err
+	}
+	return review, nil
 }
 
 func (s *PostgresStore) listOrders(query string, args ...interface{}) ([]domain.Order, error) {

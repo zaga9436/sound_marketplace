@@ -55,11 +55,12 @@ type User struct {
 }
 
 type Profile struct {
-	UserID      string    `json:"user_id"`
-	DisplayName string    `json:"display_name"`
-	Bio         string    `json:"bio"`
-	Rating      float64   `json:"rating"`
-	CreatedAt   time.Time `json:"created_at"`
+	UserID       string    `json:"user_id"`
+	DisplayName  string    `json:"display_name"`
+	Bio          string    `json:"bio"`
+	Rating       float64   `json:"rating"`
+	ReviewsCount int       `json:"reviews_count"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type Card struct {
@@ -144,4 +145,14 @@ type Dispute struct {
 	Resolution     DisputeResolution  `json:"resolution,omitempty"`
 	CreatedAt      time.Time          `json:"created_at"`
 	ClosedAt       *time.Time         `json:"closed_at,omitempty"`
+}
+
+type Review struct {
+	ID           string    `json:"id"`
+	OrderID      string    `json:"order_id"`
+	AuthorID     string    `json:"author_id"`
+	TargetUserID string    `json:"target_user_id"`
+	Rating       int       `json:"rating"`
+	Text         string    `json:"text"`
+	CreatedAt    time.Time `json:"created_at"`
 }

@@ -10,6 +10,7 @@ type Store interface {
 	GetUser(userID string) (domain.User, error)
 	GetProfile(userID string) (domain.Profile, error)
 	UpdateProfile(userID, displayName, bio string) (domain.Profile, error)
+	ListCardsByAuthor(authorID string) ([]domain.Card, error)
 
 	CreateCard(card domain.Card) (domain.Card, error)
 	UpdateCard(cardID string, payload domain.Card) (domain.Card, error)
@@ -42,6 +43,11 @@ type Store interface {
 	GetDisputeByOrderID(orderID string) (domain.Dispute, error)
 	GetOpenDisputeByOrderID(orderID string) (domain.Dispute, error)
 	CloseDispute(disputeID string, resolution domain.DisputeResolution) (domain.Dispute, error)
+
+	CreateReview(review domain.Review) (domain.Review, error)
+	GetReviewByOrderAndAuthor(orderID, authorID string) (domain.Review, error)
+	ListReviewsByTargetUser(targetUserID string) ([]domain.Review, error)
+	RefreshProfileRating(userID string) (domain.Profile, error)
 
 	CreateNotification(userID, eventType, message string) error
 }

@@ -82,6 +82,38 @@ paths:
       responses:
         '200':
           description: Public profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+  /profiles/{id}/cards:
+    get:
+      summary: List public cards by profile owner
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Public cards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Card'
+  /profiles/{id}/reviews:
+    get:
+      summary: List public verified reviews about user
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Public reviews
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Review'
   /cards:
     get:
       summary: List cards
@@ -213,6 +245,22 @@ paths:
       responses:
         '200':
           description: Order updated
+  /orders/{id}/reviews:
+    post:
+      summary: Create verified review for completed order
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewCreateRequest'
+      responses:
+        '201':
+          description: Review created
   /orders/{id}/dispute:
     get:
       summary: Get dispute for order
@@ -363,6 +411,65 @@ components:
         rating:
           type: number
           format: double
+        reviews_count:
+          type: integer
+    Card:
+      type: object
+      properties:
+        id:
+          type: string
+        author_id:
+          type: string
+        card_type:
+          type: string
+          enum: [offer, request]
+        kind:
+          type: string
+          enum: [product, service]
+        title:
+          type: string
+        description:
+          type: string
+        price:
+          type: integer
+          format: int64
+        tags:
+          type: array
+          items:
+            type: string
+        is_published:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    Review:
+      type: object
+      properties:
+        id:
+          type: string
+        order_id:
+          type: string
+        author_id:
+          type: string
+        target_user_id:
+          type: string
+        rating:
+          type: integer
+        text:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    ReviewCreateRequest:
+      type: object
+      required: [rating, text]
+      properties:
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        text:
+          type: string
     ProfileUpdateRequest:
       type: object
       required: [display_name, bio]

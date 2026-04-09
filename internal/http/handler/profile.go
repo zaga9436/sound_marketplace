@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/soundmarket/backend/internal/domain"
 	httprequest "github.com/soundmarket/backend/internal/http/request"
 	"github.com/soundmarket/backend/internal/http/middleware"
 	"github.com/soundmarket/backend/internal/http/response"
@@ -40,6 +41,30 @@ func (h *ProfileHandler) Public(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, http.StatusOK, profile)
+}
+
+func (h *ProfileHandler) Cards(w http.ResponseWriter, r *http.Request) {
+	cards, err := h.service.ListCards(chi.URLParam(r, "id"))
+	if err != nil {
+		response.FromError(w, err)
+		return
+	}
+	if cards == nil {
+		cards = []domain.Card{}
+	}
+	response.JSON(w, http.StatusOK, cards)
+}
+
+func (h *ProfileHandler) Reviews(w http.ResponseWriter, r *http.Request) {
+	reviews, err := h.service.ListReviews(chi.URLParam(r, "id"))
+	if err != nil {
+		response.FromError(w, err)
+		return
+	}
+	if reviews == nil {
+		reviews = []domain.Review{}
+	}
+	response.JSON(w, http.StatusOK, reviews)
 }
 
 func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
