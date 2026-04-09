@@ -23,12 +23,14 @@ func New(services *service.Registry) http.Handler {
 	profileHandler := handler.NewProfileHandler(services.Profile)
 	cardHandler := handler.NewCardHandler(services.Card)
 	bidHandler := handler.NewBidHandler(services.Bid)
+	chatHandler := handler.NewChatHandler(services.Chat)
+	notificationHandler := handler.NewNotificationHandler(services.Notifications)
 	orderHandler := handler.NewOrderHandler(services.Order)
 	disputeHandler := handler.NewDisputeHandler(services.Dispute)
 	reviewHandler := handler.NewReviewHandler(services.Review)
 	mediaHandler := handler.NewMediaHandler(services.Media)
 	paymentHandler := handler.NewPaymentHandler(services.Payment)
-	wsHandler := handler.NewWSHandler(services.Realtime)
+	wsHandler := handler.NewWSHandler(services.Realtime, services.Chat)
 
 	r.Get("/health", healthHandler.Get)
 
@@ -53,6 +55,9 @@ func New(services *service.Registry) http.Handler {
 			secure.Post("/cards/{id}/media/preview", mediaHandler.UploadPreview)
 			secure.Post("/cards/{id}/media/full", mediaHandler.UploadFull)
 			secure.Get("/cards/{id}/download", mediaHandler.DownloadFull)
+			secure.Get("/chats", chatHandler.ListConversations)
+			secure.Get("/notifications", notificationHandler.List)
+			secure.Post("/notifications/read", notificationHandler.MarkRead)
 			secure.Get("/requests/{id}/bids", bidHandler.List)
 			secure.Post("/requests/{id}/bids", bidHandler.Create)
 			secure.Route("/orders", func(orderRoutes chi.Router) {
@@ -61,6 +66,9 @@ func New(services *service.Registry) http.Handler {
 				orderRoutes.Get("/", orderHandler.List)
 				orderRoutes.Route("/{id}", func(order chi.Router) {
 					order.Get("/", orderHandler.Get)
+					order.Get("/messages", chatHandler.ListMessages)
+					order.Post("/messages", chatHandler.CreateMessage)
+					order.Post("/messages/read", chatHandler.MarkRead)
 					order.Patch("/status", orderHandler.UpdateStatus)
 					order.Post("/reviews", reviewHandler.Create)
 					order.Post("/dispute", disputeHandler.Open)
@@ -71,7 +79,8 @@ func New(services *service.Registry) http.Handler {
 			secure.Post("/payments/deposits", paymentHandler.CreateDeposit)
 			secure.Post("/payments/sync", paymentHandler.Sync)
 			secure.Get("/payments/balance", paymentHandler.Balance)
-			secure.Get("/ws/orders/{id}", wsHandler.Connect)
+			secure.Get("/ws/orders/{id}", wsHandler.ConnectOrder)
+			secure.Get("/ws/notifications", wsHandler.ConnectNotifications)
 		})
 	})
 

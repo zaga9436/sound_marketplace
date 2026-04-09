@@ -178,3 +178,32 @@ type MediaFile struct {
 	URL              string    `json:"url,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 }
+
+type ChatMessage struct {
+	ID         string     `json:"id"`
+	ChatRoomID string     `json:"chat_room_id"`
+	OrderID    string     `json:"order_id"`
+	SenderID   string     `json:"sender_id"`
+	Body       string     `json:"body"`
+	CreatedAt  time.Time  `json:"created_at"`
+	ReadAt     *time.Time `json:"read_at,omitempty"`
+}
+
+type Conversation struct {
+	OrderID        string     `json:"order_id"`
+	ChatRoomID     string     `json:"chat_room_id"`
+	CustomerID     string     `json:"customer_id"`
+	EngineerID     string     `json:"engineer_id"`
+	LastMessage    string     `json:"last_message,omitempty"`
+	LastMessageAt  *time.Time `json:"last_message_at,omitempty"`
+	UnreadCount    int64      `json:"unread_count"`
+}
+
+type Notification struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	Type      string    `json:"type"`
+	Message   string    `json:"message"`
+	IsRead    bool      `json:"is_read"`
+	CreatedAt time.Time `json:"created_at"`
+}

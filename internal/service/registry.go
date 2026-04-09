@@ -5,6 +5,7 @@ import (
 	"github.com/soundmarket/backend/internal/config"
 	"github.com/soundmarket/backend/internal/notifications"
 	"github.com/soundmarket/backend/internal/payments"
+	"github.com/soundmarket/backend/internal/realtime"
 	"github.com/soundmarket/backend/internal/repository"
 	"github.com/soundmarket/backend/internal/storage"
 	"github.com/soundmarket/backend/internal/worker"
@@ -14,6 +15,7 @@ type Dependencies struct {
 	Config         *config.Config
 	Store          repository.Store
 	AuthManager    *auth.JWTManager
+	Broker         *realtime.Broker
 	StorageAdapter storage.Adapter
 	PaymentAdapter payments.Provider
 	Notifier       notifications.Service
@@ -29,6 +31,8 @@ type Registry struct {
 	Dispute     *DisputeService
 	Review      *ReviewService
 	Media       *MediaService
+	Chat        *ChatService
+	Notifications *NotificationService
 	Payment     *PaymentService
 	Health      *HealthService
 	Realtime    *RealtimeService
@@ -36,6 +40,9 @@ type Registry struct {
 }
 
 func NewRegistry(deps Dependencies) *Registry {
+	chatService := NewChatService(deps.Store, deps.Broker, deps.Notifier)
+	notificationService := NewNotificationService(deps.Store, deps.Broker)
+
 	return &Registry{
 		Auth:        NewAuthService(deps.Store, deps.AuthManager),
 		Profile:     NewProfileService(deps.Store, deps.StorageAdapter),
@@ -45,9 +52,11 @@ func NewRegistry(deps Dependencies) *Registry {
 		Dispute:     NewDisputeService(deps.Store, deps.Notifier),
 		Review:      NewReviewService(deps.Store, deps.Notifier),
 		Media:       NewMediaService(deps.Config, deps.Store, deps.StorageAdapter),
+		Chat:        chatService,
+		Notifications: notificationService,
 		Payment:     NewPaymentService(deps.Config, deps.Store, deps.PaymentAdapter, deps.Notifier),
 		Health:      NewHealthService(deps.Config),
-		Realtime:    NewRealtimeService(deps.WorkerQueue, deps.StorageAdapter),
+		Realtime:    NewRealtimeService(deps.Broker, chatService, notificationService),
 		AuthManager: deps.AuthManager,
 	}
 }

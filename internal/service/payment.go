@@ -171,7 +171,7 @@ func (s *PaymentService) applyProviderResult(externalID, status string, paid boo
 		return domain.Payment{}, false, err
 	}
 	if created {
-		s.notifier.Publish(updated.UserID, "balance_deposit", "Balance replenished")
+		s.notifier.Publish(updated.UserID, "payment_succeeded", "Balance replenished")
 	}
 	return updated, created, nil
 }

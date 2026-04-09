@@ -68,6 +68,6 @@ func (s *ReviewService) Create(actor domain.User, orderID string, rating int, te
 		return domain.Review{}, err
 	}
 
-	s.notifier.Publish(created.TargetUserID, "review_created", "New verified review received")
+	s.notifier.Publish(created.TargetUserID, "review_received", "New verified review received")
 	return created, nil
 }

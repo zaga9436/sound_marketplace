@@ -14,6 +14,7 @@ import (
 	"github.com/soundmarket/backend/internal/notifications"
 	"github.com/soundmarket/backend/internal/payments"
 	"github.com/soundmarket/backend/internal/platform/db"
+	"github.com/soundmarket/backend/internal/realtime"
 	"github.com/soundmarket/backend/internal/repository"
 	"github.com/soundmarket/backend/internal/service"
 	"github.com/soundmarket/backend/internal/storage"
@@ -73,13 +74,15 @@ func New() (*App, error) {
 		_ = redisClient.Close()
 		return nil, fmt.Errorf("unsupported PAYMENT_PROVIDER: %s", cfg.PaymentProvider)
 	}
-	notifier := notifications.NewRepositoryBackedService(store)
+	broker := realtime.NewBroker(redisClient)
+	notifier := notifications.NewRepositoryBackedService(store, broker)
 	workerQueue := worker.NewInMemoryQueue()
 
 	services := service.NewRegistry(service.Dependencies{
 		Config:         cfg,
 		Store:          store,
 		AuthManager:    authManager,
+		Broker:         broker,
 		StorageAdapter: storageAdapter,
 		PaymentAdapter: paymentAdapter,
 		Notifier:       notifier,

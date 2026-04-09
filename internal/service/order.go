@@ -133,7 +133,7 @@ func (s *OrderService) CreateFromBid(customer domain.User, bidID string) (domain
 		return domain.Order{}, err
 	}
 
-	s.notifier.Publish(created.EngineerID, "bid_selected", "Your bid was selected")
+	s.notifier.Publish(created.EngineerID, "order_created", "Your bid was selected and order created")
 	return created, nil
 }
 

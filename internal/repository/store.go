@@ -1,6 +1,10 @@
 package repository
 
-import "github.com/soundmarket/backend/internal/domain"
+import (
+	"time"
+
+	"github.com/soundmarket/backend/internal/domain"
+)
 
 type Store interface {
 	WithTx(fn func(Store) error) error
@@ -20,6 +24,14 @@ type Store interface {
 	ListMediaByCardAndRole(cardID string, role domain.MediaRole) ([]domain.MediaFile, error)
 	GetLatestMediaByCardAndRole(cardID string, role domain.MediaRole) (domain.MediaFile, error)
 	UserHasCompletedCardAccess(cardID, userID string) (bool, error)
+	GetChatRoomByOrderID(orderID string) (string, error)
+	CreateMessage(orderID, senderID, body string) (domain.ChatMessage, error)
+	ListMessages(orderID, userID string, limit int, beforeID string) ([]domain.ChatMessage, error)
+	CountUnreadMessages(orderID, userID string) (int64, error)
+	MarkChatRead(orderID, userID string, readAt time.Time) error
+	ListConversationsByCustomer(userID string, limit int) ([]domain.Conversation, error)
+	ListConversationsByEngineer(userID string, limit int) ([]domain.Conversation, error)
+	ListConversations(limit int) ([]domain.Conversation, error)
 
 	CreateBid(bid domain.Bid) (domain.Bid, error)
 	ListBidsByRequest(requestID string) ([]domain.Bid, error)
@@ -53,5 +65,8 @@ type Store interface {
 	ListReviewsByTargetUser(targetUserID string) ([]domain.Review, error)
 	RefreshProfileRating(userID string) (domain.Profile, error)
 
-	CreateNotification(userID, eventType, message string) error
+	CreateNotification(userID, eventType, message string) (domain.Notification, error)
+	ListNotifications(userID string, limit int, beforeID string) ([]domain.Notification, error)
+	MarkNotificationsRead(userID string, ids []string) error
+	CountUnreadNotifications(userID string) (int64, error)
 }

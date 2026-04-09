@@ -64,7 +64,13 @@ func (s *DisputeService) Open(actor domain.User, orderID, reason string) (domain
 		return domain.Dispute{}, err
 	}
 
-	s.notifier.Publish(created.OpenedByUserID, "dispute_opened", "Dispute opened")
+	order, orderErr := s.store.GetOrder(orderID)
+	if orderErr == nil {
+		s.notifier.Publish(order.CustomerID, "dispute_opened", "Dispute opened")
+		if order.EngineerID != order.CustomerID {
+			s.notifier.Publish(order.EngineerID, "dispute_opened", "Dispute opened")
+		}
+	}
 	return created, nil
 }
 
@@ -142,6 +148,12 @@ func (s *DisputeService) Close(actor domain.User, orderID string, resolution dom
 		return domain.Dispute{}, err
 	}
 
-	s.notifier.Publish(closed.OpenedByUserID, "dispute_closed", "Dispute closed")
+	order, orderErr := s.store.GetOrder(orderID)
+	if orderErr == nil {
+		s.notifier.Publish(order.CustomerID, "dispute_closed", "Dispute closed")
+		if order.EngineerID != order.CustomerID {
+			s.notifier.Publish(order.EngineerID, "dispute_closed", "Dispute closed")
+		}
+	}
 	return closed, nil
 }

@@ -114,6 +114,25 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Review'
+  /chats:
+    get:
+      summary: List user conversations
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Conversation'
   /cards:
     get:
       summary: List cards
@@ -303,6 +322,59 @@ paths:
       responses:
         '200':
           description: Order
+  /orders/{id}/messages:
+    get:
+      summary: List order chat messages
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: before_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatMessage'
+    post:
+      summary: Send order chat message
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessageCreateRequest'
+      responses:
+        '201':
+          description: Message created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+  /orders/{id}/messages/read:
+    post:
+      summary: Mark order chat as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Chat marked as read
   /orders/{id}/status:
     patch:
       summary: Update order status
@@ -410,6 +482,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaymentWebhookResponse'
+  /notifications:
+    get:
+      summary: List notifications
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: before_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notifications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListResponse'
+  /notifications/read:
+    post:
+      summary: Mark notifications as read, or mark all when ids omitted
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationsReadRequest'
+      responses:
+        '200':
+          description: Notifications updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationListResponse'
   /payments/sync:
     post:
       summary: Dev-only manual sync of YooKassa payment status into internal ledger
@@ -438,14 +549,22 @@ paths:
           description: Balance
   /ws/orders/{id}:
     get:
-      summary: Get placeholder websocket metadata for order chat
+      summary: Open realtime websocket for order chat
       security:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/ID'
       responses:
-        '200':
-          description: Chat bootstrap payload
+        '101':
+          description: WebSocket upgraded
+  /ws/notifications:
+    get:
+      summary: Open realtime websocket for notifications
+      security:
+        - bearerAuth: []
+      responses:
+        '101':
+          description: WebSocket upgraded
 components:
   securitySchemes:
     bearerAuth:
@@ -605,6 +724,50 @@ components:
           maximum: 5
         text:
           type: string
+    Conversation:
+      type: object
+      properties:
+        order_id:
+          type: string
+        chat_room_id:
+          type: string
+        customer_id:
+          type: string
+        engineer_id:
+          type: string
+        last_message:
+          type: string
+        last_message_at:
+          type: string
+          format: date-time
+        unread_count:
+          type: integer
+          format: int64
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        chat_room_id:
+          type: string
+        order_id:
+          type: string
+        sender_id:
+          type: string
+        body:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        read_at:
+          type: string
+          format: date-time
+    ChatMessageCreateRequest:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
     ProfileUpdateRequest:
       type: object
       required: [display_name, bio]
@@ -727,3 +890,36 @@ components:
       properties:
         external_id:
           type: string
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        type:
+          type: string
+        message:
+          type: string
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+    NotificationListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+        unread_count:
+          type: integer
+          format: int64
+    NotificationsReadRequest:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: string

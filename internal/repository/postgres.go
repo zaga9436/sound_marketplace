@@ -319,6 +319,181 @@ func (s *PostgresStore) UserHasCompletedCardAccess(cardID, userID string) (bool,
 	return exists, err
 }
 
+func (s *PostgresStore) GetChatRoomByOrderID(orderID string) (string, error) {
+	var chatRoomID string
+	err := s.runner().QueryRow(
+		`SELECT id FROM chat_rooms WHERE order_id = $1`,
+		orderID,
+	).Scan(&chatRoomID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrNotFound
+		}
+		return "", err
+	}
+	return chatRoomID, nil
+}
+
+func (s *PostgresStore) CreateMessage(orderID, senderID, body string) (domain.ChatMessage, error) {
+	chatRoomID, err := s.GetChatRoomByOrderID(orderID)
+	if err != nil {
+		return domain.ChatMessage{}, err
+	}
+	message := domain.ChatMessage{
+		ID:         uuid.NewString(),
+		ChatRoomID: chatRoomID,
+		OrderID:    orderID,
+		SenderID:   senderID,
+		Body:       body,
+		CreatedAt:  time.Now().UTC(),
+	}
+	_, err = s.runner().Exec(
+		`INSERT INTO messages (id, chat_room_id, sender_id, body, created_at)
+		 VALUES ($1, $2, $3, $4, $5)`,
+		message.ID, message.ChatRoomID, message.SenderID, message.Body, message.CreatedAt,
+	)
+	if err != nil {
+		return domain.ChatMessage{}, err
+	}
+	return message, nil
+}
+
+func (s *PostgresStore) ListMessages(orderID, userID string, limit int, beforeID string) ([]domain.ChatMessage, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	args := []interface{}{orderID, userID, limit}
+	query := `SELECT m.id, m.chat_room_id, cr.order_id, m.sender_id, m.body, m.created_at,
+		rr.last_read_at
+	FROM messages m
+	JOIN chat_rooms cr ON cr.id = m.chat_room_id
+	LEFT JOIN chat_room_reads rr ON rr.chat_room_id = m.chat_room_id AND rr.user_id = $2
+	WHERE cr.order_id = $1`
+	if beforeID != "" {
+		args = append(args, beforeID)
+		query += fmt.Sprintf(" AND m.created_at < (SELECT created_at FROM messages WHERE id = $%d)", len(args))
+	}
+	query += " ORDER BY m.created_at DESC LIMIT $3"
+
+	rows, err := s.runner().Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	messages := make([]domain.ChatMessage, 0)
+	for rows.Next() {
+		var msg domain.ChatMessage
+		var readAt sql.NullTime
+		if err := rows.Scan(&msg.ID, &msg.ChatRoomID, &msg.OrderID, &msg.SenderID, &msg.Body, &msg.CreatedAt, &readAt); err != nil {
+			return nil, err
+		}
+		if readAt.Valid {
+			t := readAt.Time
+			msg.ReadAt = &t
+		}
+		messages = append(messages, msg)
+	}
+	return messages, rows.Err()
+}
+
+func (s *PostgresStore) CountUnreadMessages(orderID, userID string) (int64, error) {
+	var count int64
+	err := s.runner().QueryRow(
+		`SELECT COUNT(*)
+		 FROM messages m
+		 JOIN chat_rooms cr ON cr.id = m.chat_room_id
+		 LEFT JOIN chat_room_reads rr
+		   ON rr.chat_room_id = cr.id AND rr.user_id = $2
+		 WHERE cr.order_id = $1
+		   AND m.sender_id <> $2
+		   AND (rr.last_read_at IS NULL OR m.created_at > rr.last_read_at)`,
+		orderID, userID,
+	).Scan(&count)
+	return count, err
+}
+
+func (s *PostgresStore) MarkChatRead(orderID, userID string, readAt time.Time) error {
+	chatRoomID, err := s.GetChatRoomByOrderID(orderID)
+	if err != nil {
+		return err
+	}
+	_, err = s.runner().Exec(
+		`INSERT INTO chat_room_reads (chat_room_id, user_id, last_read_at)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (chat_room_id, user_id)
+		 DO UPDATE SET last_read_at = EXCLUDED.last_read_at`,
+		chatRoomID, userID, readAt,
+	)
+	return err
+}
+
+func (s *PostgresStore) ListConversationsByCustomer(userID string, limit int) ([]domain.Conversation, error) {
+	return s.listConversations(
+		`SELECT o.id, cr.id, o.customer_id, o.engineer_id,
+		        COALESCE(last_message.body, ''),
+		        last_message.created_at
+		 FROM orders o
+		 JOIN chat_rooms cr ON cr.order_id = o.id
+		 LEFT JOIN LATERAL (
+		     SELECT body, created_at
+		     FROM messages m
+		     WHERE m.chat_room_id = cr.id
+		     ORDER BY created_at DESC
+		     LIMIT 1
+		 ) last_message ON TRUE
+		 WHERE o.customer_id = $1
+		 ORDER BY COALESCE(last_message.created_at, o.created_at) DESC
+		 LIMIT $2`,
+		userID, limit,
+	)
+}
+
+func (s *PostgresStore) ListConversationsByEngineer(userID string, limit int) ([]domain.Conversation, error) {
+	return s.listConversations(
+		`SELECT o.id, cr.id, o.customer_id, o.engineer_id,
+		        COALESCE(last_message.body, ''),
+		        last_message.created_at
+		 FROM orders o
+		 JOIN chat_rooms cr ON cr.order_id = o.id
+		 LEFT JOIN LATERAL (
+		     SELECT body, created_at
+		     FROM messages m
+		     WHERE m.chat_room_id = cr.id
+		     ORDER BY created_at DESC
+		     LIMIT 1
+		 ) last_message ON TRUE
+		 WHERE o.engineer_id = $1
+		 ORDER BY COALESCE(last_message.created_at, o.created_at) DESC
+		 LIMIT $2`,
+		userID, limit,
+	)
+}
+
+func (s *PostgresStore) ListConversations(limit int) ([]domain.Conversation, error) {
+	return s.listConversations(
+		`SELECT o.id, cr.id, o.customer_id, o.engineer_id,
+		        COALESCE(last_message.body, ''),
+		        last_message.created_at
+		 FROM orders o
+		 JOIN chat_rooms cr ON cr.order_id = o.id
+		 LEFT JOIN LATERAL (
+		     SELECT body, created_at
+		     FROM messages m
+		     WHERE m.chat_room_id = cr.id
+		     ORDER BY created_at DESC
+		     LIMIT 1
+		 ) last_message ON TRUE
+		 ORDER BY COALESCE(last_message.created_at, o.created_at) DESC
+		 LIMIT $1`,
+		limit,
+	)
+}
+
 func (s *PostgresStore) CreateBid(bid domain.Bid) (domain.Bid, error) {
 	bid.ID = uuid.NewString()
 	bid.CreatedAt = time.Now().UTC()
@@ -692,12 +867,82 @@ func (s *PostgresStore) RefreshProfileRating(userID string) (domain.Profile, err
 	return s.GetProfile(userID)
 }
 
-func (s *PostgresStore) CreateNotification(userID, eventType, message string) error {
+func (s *PostgresStore) CreateNotification(userID, eventType, message string) (domain.Notification, error) {
+	notification := domain.Notification{
+		ID:        uuid.NewString(),
+		UserID:    userID,
+		Type:      eventType,
+		Message:   message,
+		IsRead:    false,
+		CreatedAt: time.Now().UTC(),
+	}
 	_, err := s.runner().Exec(
 		`INSERT INTO notifications (id, user_id, type, message, is_read, created_at) VALUES ($1, $2, $3, $4, FALSE, $5)`,
-		uuid.NewString(), userID, eventType, message, time.Now().UTC(),
+		notification.ID, notification.UserID, notification.Type, notification.Message, notification.CreatedAt,
+	)
+	if err != nil {
+		return domain.Notification{}, err
+	}
+	return notification, nil
+}
+
+func (s *PostgresStore) ListNotifications(userID string, limit int, beforeID string) ([]domain.Notification, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	args := []interface{}{userID, limit}
+	query := `SELECT id, user_id, type, message, is_read, created_at
+	          FROM notifications
+	          WHERE user_id = $1`
+	if beforeID != "" {
+		args = append(args, beforeID)
+		query += fmt.Sprintf(" AND created_at < (SELECT created_at FROM notifications WHERE id = $%d)", len(args))
+	}
+	query += " ORDER BY created_at DESC LIMIT $2"
+
+	rows, err := s.runner().Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	notifications := make([]domain.Notification, 0)
+	for rows.Next() {
+		var notification domain.Notification
+		if err := rows.Scan(&notification.ID, &notification.UserID, &notification.Type, &notification.Message, &notification.IsRead, &notification.CreatedAt); err != nil {
+			return nil, err
+		}
+		notifications = append(notifications, notification)
+	}
+	return notifications, rows.Err()
+}
+
+func (s *PostgresStore) MarkNotificationsRead(userID string, ids []string) error {
+	if len(ids) == 0 {
+		_, err := s.runner().Exec(
+			`UPDATE notifications SET is_read = TRUE WHERE user_id = $1 AND is_read = FALSE`,
+			userID,
+		)
+		return err
+	}
+	_, err := s.runner().Exec(
+		`UPDATE notifications SET is_read = TRUE WHERE user_id = $1 AND id = ANY($2)`,
+		userID, pq.Array(ids),
 	)
 	return err
+}
+
+func (s *PostgresStore) CountUnreadNotifications(userID string) (int64, error) {
+	var count int64
+	err := s.runner().QueryRow(
+		`SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND is_read = FALSE`,
+		userID,
+	).Scan(&count)
+	return count, err
 }
 
 func (s *PostgresStore) scanUser(row *sql.Row) (domain.User, error) {
@@ -846,4 +1091,34 @@ func (s *PostgresStore) listOrders(query string, args ...interface{}) ([]domain.
 		orders = append(orders, order)
 	}
 	return orders, rows.Err()
+}
+
+func (s *PostgresStore) listConversations(query string, args ...interface{}) ([]domain.Conversation, error) {
+	rows, err := s.runner().Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	conversations := make([]domain.Conversation, 0)
+	for rows.Next() {
+		var conversation domain.Conversation
+		var lastMessageAt sql.NullTime
+		if err := rows.Scan(
+			&conversation.OrderID,
+			&conversation.ChatRoomID,
+			&conversation.CustomerID,
+			&conversation.EngineerID,
+			&conversation.LastMessage,
+			&lastMessageAt,
+		); err != nil {
+			return nil, err
+		}
+		if lastMessageAt.Valid {
+			t := lastMessageAt.Time
+			conversation.LastMessageAt = &t
+		}
+		conversations = append(conversations, conversation)
+	}
+	return conversations, rows.Err()
 }
