@@ -19,4 +19,7 @@ docker-data/
 postgres-data/
 redis-data/
 ent/migrate/schema.go
-
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/

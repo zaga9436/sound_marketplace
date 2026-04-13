@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 42 30% 98%;
+  --foreground: 210 28% 12%;
+  --card: 0 0% 100%;
+  --card-foreground: 210 28% 12%;
+  --primary: 185 68% 32%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 42 40% 94%;
+  --secondary-foreground: 210 28% 18%;
+  --muted: 40 20% 93%;
+  --muted-foreground: 215 13% 42%;
+  --accent: 35 88% 92%;
+  --accent-foreground: 28 65% 26%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 32 22% 87%;
+  --input: 32 22% 87%;
+  --ring: 185 68% 32%;
+  --radius: 1rem;
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  background-image:
+    radial-gradient(circle at top left, rgba(13, 148, 136, 0.08), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(251, 191, 36, 0.10), transparent 24%);
+}
+
+@layer base {
+  h1 {
+    @apply text-4xl font-semibold tracking-tight md:text-5xl;
+  }
+
+  h2 {
+    @apply text-2xl font-semibold tracking-tight md:text-3xl;
+  }
+
+  h3 {
+    @apply text-xl font-semibold tracking-tight;
+  }
+
+  p {
+    @apply leading-7 text-foreground/80;
+  }
+}
+
+@layer utilities {
+  .surface {
+    @apply rounded-xl border bg-card/90 shadow-soft backdrop-blur;
+  }
+
+  .page-frame {
+    @apply min-h-screen bg-background;
+  }
+}
