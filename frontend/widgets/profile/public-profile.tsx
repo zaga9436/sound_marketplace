@@ -9,6 +9,7 @@ import { CardPreview } from "@/entities/card/ui/card-preview";
 import { getErrorMessage } from "@/lib/api/errors";
 import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { UserAvatar } from "@/shared/ui/user-avatar";
 
 export function PublicProfile({ id }: { id: string }) {
   const profileQuery = useQuery({
@@ -49,13 +50,18 @@ export function PublicProfile({ id }: { id: string }) {
   return (
     <div className="space-y-8">
       <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
-        <CardHeader className="space-y-4">
-          <Badge className="bg-slate-900/90 text-white" variant="secondary">
+        <CardHeader className="space-y-5">
+          <Badge className="bg-slate-950 text-white" variant="secondary">
             Публичный профиль
           </Badge>
-          <div className="space-y-2">
-            <CardTitle className="text-3xl text-slate-950">{profile.display_name}</CardTitle>
-            <p>{profile.bio || "Автор пока не добавил описание профиля."}</p>
+          <div className="flex flex-col gap-5 md:flex-row md:items-start">
+            <UserAvatar avatarUrl={profile.avatar_url} name={profile.display_name} className="h-24 w-24 rounded-[2rem] text-2xl" />
+            <div className="space-y-3">
+              <CardTitle className="text-3xl text-slate-950">{profile.display_name}</CardTitle>
+              <p className="max-w-3xl leading-7 text-slate-700">
+                {profile.bio || "Автор пока не добавил описание профиля. Здесь обычно появляется краткое представление о специализации и стиле работы."}
+              </p>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-6">
@@ -76,7 +82,7 @@ export function PublicProfile({ id }: { id: string }) {
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2>Карточки автора</h2>
+          <h2 className="text-2xl font-semibold text-slate-950">Карточки автора</h2>
           <Link href="/catalog" className="text-sm font-medium text-primary">
             Вернуться в каталог
           </Link>
@@ -85,7 +91,7 @@ export function PublicProfile({ id }: { id: string }) {
         {cards.length === 0 ? (
           <Card className="border-slate-200/80 bg-white/95">
             <CardContent className="pt-6">
-              <p>У автора пока нет публичных карточек.</p>
+              <p className="text-slate-700">У автора пока нет публичных карточек.</p>
             </CardContent>
           </Card>
         ) : (
@@ -99,14 +105,14 @@ export function PublicProfile({ id }: { id: string }) {
 
       <section className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2>Последние отзывы</h2>
+          <h2 className="text-2xl font-semibold text-slate-950">Последние отзывы</h2>
           <Badge variant="secondary">{reviews.length} показано</Badge>
         </div>
 
         {reviews.length === 0 ? (
           <Card className="border-slate-200/80 bg-white/95">
             <CardContent className="pt-6">
-              <p>Пока отзывов нет.</p>
+              <p className="text-slate-700">Пока отзывов нет.</p>
             </CardContent>
           </Card>
         ) : (
@@ -115,13 +121,13 @@ export function PublicProfile({ id }: { id: string }) {
               <Card key={review.id} className="border-slate-200/80 bg-white/95">
                 <CardHeader className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
-                    <CardTitle className="text-lg">Оценка {review.rating}/5</CardTitle>
+                    <CardTitle className="text-lg text-slate-950">Оценка {review.rating}/5</CardTitle>
                     <Badge variant="secondary">{new Date(review.created_at).toLocaleDateString("ru-RU")}</Badge>
                   </div>
                   <CardDescription className="font-mono text-xs">Заказ {review.order_id}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm leading-6 text-foreground/80">{review.text || "Проверенный отзыв."}</p>
+                  <p className="text-sm leading-6 text-slate-700">{review.text || "Проверенный отзыв о сотрудничестве."}</p>
                 </CardContent>
               </Card>
             ))}

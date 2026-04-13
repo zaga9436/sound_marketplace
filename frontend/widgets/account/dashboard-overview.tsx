@@ -11,6 +11,7 @@ import { useAuthStore } from "@/lib/auth/session-store";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
+import { UserAvatar } from "@/shared/ui/user-avatar";
 
 function createCardHref(role?: string | null) {
   if (role === "customer") return "/cards/new?type=request";
@@ -24,6 +25,13 @@ function formatPrice(value: number) {
     currency: "RUB",
     maximumFractionDigits: 0
   }).format(value);
+}
+
+function formatRole(role?: string | null) {
+  if (role === "customer") return "Заказчик";
+  if (role === "engineer") return "Исполнитель";
+  if (role === "admin") return "Администратор";
+  return "Гость";
 }
 
 export function DashboardOverview() {
@@ -62,19 +70,29 @@ export function DashboardOverview() {
     <div className="space-y-8">
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,1fr)]">
         <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
-          <CardHeader className="space-y-4">
-            <Badge className="bg-slate-900/90 text-white" variant="secondary">
+          <CardHeader className="space-y-5">
+            <Badge className="w-fit bg-slate-950 text-white" variant="secondary">
               Личный кабинет
             </Badge>
-            <div className="space-y-2">
-              <CardTitle className="text-3xl text-slate-950">С возвращением, {profile?.display_name || user?.email || "пользователь"}.</CardTitle>
-              <CardDescription className="max-w-2xl text-base leading-7 text-slate-600">
-                Отсюда удобно обновлять профиль, создавать карточки, следить за заказами и быстро переходить к деньгам, чатам и сделкам.
-              </CardDescription>
+            <div className="flex flex-col gap-5 md:flex-row md:items-center">
+              <UserAvatar
+                avatarUrl={profile?.avatar_url}
+                name={profile?.display_name}
+                email={user?.email}
+                className="h-20 w-20 rounded-[1.75rem] text-xl"
+              />
+              <div className="space-y-2">
+                <CardTitle className="text-3xl text-slate-950">
+                  {profile?.display_name || user?.email || "Добро пожаловать в SoundMarket"}
+                </CardTitle>
+                <CardDescription className="max-w-2xl text-base leading-7 text-slate-600">
+                  Отсюда удобно управлять профилем, карточками, заказами и балансом. Все основные действия по сделкам уже собраны в одном месте.
+                </CardDescription>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
-            <Button asChild size="lg" className="rounded-2xl bg-slate-900 text-white hover:bg-slate-800">
+            <Button asChild size="lg" className="rounded-2xl bg-slate-950 text-white hover:bg-slate-800">
               <Link href="/profile">Мой профиль</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100">
@@ -96,12 +114,12 @@ export function DashboardOverview() {
 
         <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
           <CardHeader>
-            <CardTitle className="text-xl">Сводка</CardTitle>
+            <CardTitle className="text-xl text-slate-950">Сводка профиля</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <div>
               <p className="text-sm text-slate-500">Роль</p>
-              <p className="text-lg font-semibold capitalize text-slate-950">{user?.role ?? "guest"}</p>
+              <p className="text-lg font-semibold text-slate-950">{formatRole(user?.role)}</p>
             </div>
             <div>
               <p className="text-sm text-slate-500">Рейтинг</p>
@@ -126,8 +144,8 @@ export function DashboardOverview() {
       <section className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2>Ваши последние карточки</h2>
-            <p className="text-sm text-slate-500">Быстрый доступ к карточкам, которые уже опубликованы в маркетплейсе.</p>
+            <h2 className="text-2xl font-semibold text-slate-950">Ваши последние карточки</h2>
+            <p className="text-sm text-slate-500">Быстрый доступ к карточкам, которые уже опубликованы в SoundMarket.</p>
           </div>
           {canCreateCards ? (
             <Button asChild variant="outline" className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100">
@@ -145,9 +163,9 @@ export function DashboardOverview() {
         ) : cards.length === 0 ? (
           <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
             <CardContent className="flex flex-col items-start gap-4 pt-6">
-              <p>У вас пока нет публичных карточек.</p>
+              <p className="text-slate-700">У вас пока нет публичных карточек.</p>
               {canCreateCards ? (
-                <Button asChild className="rounded-2xl bg-slate-900 text-white hover:bg-slate-800">
+                <Button asChild className="rounded-2xl bg-slate-950 text-white hover:bg-slate-800">
                   <Link href={createCardHref(user?.role)}>Создать первую карточку</Link>
                 </Button>
               ) : null}

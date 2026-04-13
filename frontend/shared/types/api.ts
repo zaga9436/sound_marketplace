@@ -7,12 +7,14 @@ export interface User {
   is_suspended?: boolean;
   suspension_reason?: string;
   suspended_at?: string;
+  created_at?: string;
 }
 
 export interface Profile {
   user_id: string;
   display_name: string;
   bio: string;
+  avatar_url?: string;
   rating: number;
   reviews_count: number;
   created_at?: string;
@@ -142,7 +144,7 @@ export interface MediaFile {
   original_filename: string;
   content_type: string;
   size_bytes: number;
-  media_role: "cover" | "preview" | "full";
+  media_role: "avatar" | "cover" | "preview" | "full";
   url?: string;
   created_at?: string;
 }
@@ -207,4 +209,14 @@ export interface PaymentSyncResponse {
 
 export interface ApiErrorPayload {
   error: string;
+}
+
+export interface ModerationAction {
+  id: string;
+  admin_user_id: string;
+  target_type: "user" | "card" | "dispute";
+  target_id: string;
+  action: string;
+  reason?: string;
+  created_at: string;
 }
