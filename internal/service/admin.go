@@ -95,19 +95,19 @@ func (s *AdminService) UnsuspendUser(actor domain.User, userID, reason string) (
 	return user, nil
 }
 
-func (s *AdminService) ListCards(actor domain.User, cardType, query, visibility string) ([]domain.Card, error) {
+func (s *AdminService) ListCards(actor domain.User, query domain.CardQuery) (domain.CardList, error) {
 	if actor.Role != domain.RoleAdmin {
-		return nil, apierr.Forbidden("forbidden")
+		return domain.CardList{}, apierr.Forbidden("forbidden")
 	}
-	cards, err := s.store.ListCardsForAdmin(strings.TrimSpace(cardType), strings.TrimSpace(query), strings.TrimSpace(visibility))
+	cards, err := s.store.ListCardsForAdmin(query)
 	if err != nil {
-		return nil, err
+		return domain.CardList{}, err
 	}
-	if cards == nil {
-		return []domain.Card{}, nil
+	if err := s.attachPreviewURLs(context.Background(), cards.Items); err != nil {
+		return domain.CardList{}, err
 	}
-	if err := s.attachPreviewURLs(context.Background(), cards); err != nil {
-		return nil, err
+	if cards.Items == nil {
+		cards.Items = []domain.Card{}
 	}
 	return cards, nil
 }

@@ -82,6 +82,29 @@ type Card struct {
 	CreatedAt        time.Time `json:"created_at"`
 }
 
+type CardQuery struct {
+	CardType    CardType `json:"card_type,omitempty"`
+	Kind        CardKind `json:"kind,omitempty"`
+	AuthorID    string   `json:"author_id,omitempty"`
+	Query       string   `json:"q,omitempty"`
+	Tag         string   `json:"tag,omitempty"`
+	MinPrice    *int64   `json:"min_price,omitempty"`
+	MaxPrice    *int64   `json:"max_price,omitempty"`
+	IsPublished *bool    `json:"is_published,omitempty"`
+	Visibility  string   `json:"visibility,omitempty"`
+	SortBy      string   `json:"sort_by,omitempty"`
+	SortOrder   string   `json:"sort_order,omitempty"`
+	Limit       int      `json:"limit,omitempty"`
+	Offset      int      `json:"offset,omitempty"`
+}
+
+type CardList struct {
+	Items  []Card `json:"items"`
+	Total  int64  `json:"total"`
+	Limit  int    `json:"limit"`
+	Offset int    `json:"offset"`
+}
+
 type Bid struct {
 	ID         string    `json:"id"`
 	RequestID  string    `json:"request_id"`

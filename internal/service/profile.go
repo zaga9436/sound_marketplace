@@ -26,19 +26,19 @@ func (s *ProfileService) Get(userID string) (domain.Profile, error) {
 	return profile, nil
 }
 
-func (s *ProfileService) ListCards(userID string) ([]domain.Card, error) {
+func (s *ProfileService) ListCards(userID string, query domain.CardQuery) (domain.CardList, error) {
 	if _, err := s.store.GetProfile(userID); err != nil {
-		return nil, apierr.NotFound("profile not found")
+		return domain.CardList{}, apierr.NotFound("profile not found")
 	}
-	cards, err := s.store.ListCardsByAuthor(userID)
+	cards, err := s.store.ListCardsByAuthor(userID, query)
 	if err != nil {
-		return nil, err
+		return domain.CardList{}, err
 	}
-	if cards == nil {
-		return []domain.Card{}, nil
+	if err := s.attachPreviewURLs(context.Background(), cards.Items); err != nil {
+		return domain.CardList{}, err
 	}
-	if err := s.attachPreviewURLs(context.Background(), cards); err != nil {
-		return nil, err
+	if cards.Items == nil {
+		cards.Items = []domain.Card{}
 	}
 	return cards, nil
 }

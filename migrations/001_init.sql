@@ -179,6 +179,8 @@ CREATE TABLE IF NOT EXISTS moderation_actions (
 
 CREATE INDEX IF NOT EXISTS idx_users_role_suspended ON users(role, is_suspended);
 CREATE INDEX IF NOT EXISTS idx_cards_hidden_created_at ON cards(is_hidden, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cards_search_tsv ON cards
+USING GIN (to_tsvector('simple'::regconfig, COALESCE(title, '') || ' ' || COALESCE(description, '')));
 CREATE INDEX IF NOT EXISTS idx_disputes_status_created_at ON disputes(status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_moderation_actions_target ON moderation_actions(target_type, target_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_deliverables_order_version ON deliverables(order_id, version DESC);

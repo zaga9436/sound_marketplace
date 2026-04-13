@@ -2,8 +2,10 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/soundmarket/backend/internal/apierr"
 	"github.com/soundmarket/backend/internal/domain"
 	httprequest "github.com/soundmarket/backend/internal/http/request"
 	"github.com/soundmarket/backend/internal/http/middleware"
@@ -44,13 +46,15 @@ func (h *ProfileHandler) Public(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProfileHandler) Cards(w http.ResponseWriter, r *http.Request) {
-	cards, err := h.service.ListCards(chi.URLParam(r, "id"))
+	query, err := profileCardQueryFromRequest(r)
 	if err != nil {
 		response.FromError(w, err)
 		return
 	}
-	if cards == nil {
-		cards = []domain.Card{}
+	cards, err := h.service.ListCards(chi.URLParam(r, "id"), query)
+	if err != nil {
+		response.FromError(w, err)
+		return
 	}
 	response.JSON(w, http.StatusOK, cards)
 }
@@ -80,4 +84,45 @@ func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, http.StatusOK, profile)
+}
+
+func profileCardQueryFromRequest(r *http.Request) (domain.CardQuery, error) {
+	values := r.URL.Query()
+	query := domain.CardQuery{
+		CardType:  domain.CardType(values.Get("card_type")),
+		Kind:      domain.CardKind(values.Get("kind")),
+		Query:     values.Get("q"),
+		Tag:       values.Get("tag"),
+		SortBy:    values.Get("sort_by"),
+		SortOrder: values.Get("sort_order"),
+	}
+	if limit := values.Get("limit"); limit != "" {
+		parsed, err := strconv.Atoi(limit)
+		if err != nil {
+			return domain.CardQuery{}, apierr.BadRequest("invalid limit")
+		}
+		query.Limit = parsed
+	}
+	if offset := values.Get("offset"); offset != "" {
+		parsed, err := strconv.Atoi(offset)
+		if err != nil {
+			return domain.CardQuery{}, apierr.BadRequest("invalid offset")
+		}
+		query.Offset = parsed
+	}
+	if minPrice := values.Get("min_price"); minPrice != "" {
+		parsed, err := strconv.ParseInt(minPrice, 10, 64)
+		if err != nil {
+			return domain.CardQuery{}, apierr.BadRequest("invalid min_price")
+		}
+		query.MinPrice = &parsed
+	}
+	if maxPrice := values.Get("max_price"); maxPrice != "" {
+		parsed, err := strconv.ParseInt(maxPrice, 10, 64)
+		if err != nil {
+			return domain.CardQuery{}, apierr.BadRequest("invalid max_price")
+		}
+		query.MaxPrice = &parsed
+	}
+	return query, nil
 }

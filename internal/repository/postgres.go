@@ -197,28 +197,10 @@ func (s *PostgresStore) UpdateProfile(userID, displayName, bio string) (domain.P
 	return s.GetProfile(userID)
 }
 
-func (s *PostgresStore) ListCardsByAuthor(authorID string) ([]domain.Card, error) {
-	rows, err := s.runner().Query(
-		`SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, is_hidden, moderation_reason, created_at
-		 FROM cards
-		 WHERE author_id = $1 AND is_hidden = FALSE
-		 ORDER BY created_at DESC`,
-		authorID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	cards := make([]domain.Card, 0)
-	for rows.Next() {
-		var card domain.Card
-		if err := rows.Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.IsHidden, &card.ModerationReason, &card.CreatedAt); err != nil {
-			return nil, err
-		}
-		cards = append(cards, card)
-	}
-	return cards, rows.Err()
+func (s *PostgresStore) ListCardsByAuthor(authorID string, query domain.CardQuery) (domain.CardList, error) {
+	query.AuthorID = authorID
+	query.Visibility = "visible"
+	return s.listCardsWithQuery(query, false)
 }
 
 func (s *PostgresStore) CreateCard(card domain.Card) (domain.Card, error) {
@@ -252,43 +234,9 @@ func (s *PostgresStore) UpdateCard(cardID string, payload domain.Card) (domain.C
 	return s.GetCard(cardID)
 }
 
-func (s *PostgresStore) ListCards(cardType, query string) ([]domain.Card, error) {
-	base := `SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, is_hidden, moderation_reason, created_at FROM cards`
-	args := make([]interface{}, 0, 2)
-	conditions := make([]string, 0, 3)
-	conditions = append(conditions, "is_hidden = FALSE")
-
-	if cardType != "" {
-		args = append(args, cardType)
-		conditions = append(conditions, fmt.Sprintf("card_type = $%d", len(args)))
-	}
-	if query != "" {
-		args = append(args, "%"+strings.ToLower(query)+"%")
-		conditions = append(conditions, fmt.Sprintf("(LOWER(title) LIKE $%d OR LOWER(description) LIKE $%d)", len(args), len(args)))
-	}
-	if len(conditions) > 0 {
-		base += " WHERE " + strings.Join(conditions, " AND ")
-	}
-	base += " ORDER BY created_at DESC"
-
-	rows, err := s.runner().Query(base, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var cards []domain.Card
-	for rows.Next() {
-		var card domain.Card
-		if err := rows.Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.IsHidden, &card.ModerationReason, &card.CreatedAt); err != nil {
-			return nil, err
-		}
-		cards = append(cards, card)
-	}
-	if cards == nil {
-		cards = make([]domain.Card, 0)
-	}
-	return cards, rows.Err()
+func (s *PostgresStore) ListCards(query domain.CardQuery) (domain.CardList, error) {
+	query.Visibility = "visible"
+	return s.listCardsWithQuery(query, false)
 }
 
 func (s *PostgresStore) GetCard(cardID string) (domain.Card, error) {
@@ -306,41 +254,8 @@ func (s *PostgresStore) GetCard(cardID string) (domain.Card, error) {
 	return card, nil
 }
 
-func (s *PostgresStore) ListCardsForAdmin(cardType, query, visibility string) ([]domain.Card, error) {
-	base := `SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, is_hidden, moderation_reason, created_at FROM cards`
-	args := make([]interface{}, 0, 3)
-	conditions := make([]string, 0, 3)
-	if cardType != "" {
-		args = append(args, cardType)
-		conditions = append(conditions, fmt.Sprintf("card_type = $%d", len(args)))
-	}
-	if query != "" {
-		args = append(args, "%"+strings.ToLower(query)+"%")
-		conditions = append(conditions, fmt.Sprintf("(LOWER(title) LIKE $%d OR LOWER(description) LIKE $%d)", len(args), len(args)))
-	}
-	if visibility == "hidden" {
-		conditions = append(conditions, "is_hidden = TRUE")
-	} else if visibility == "visible" {
-		conditions = append(conditions, "is_hidden = FALSE")
-	}
-	if len(conditions) > 0 {
-		base += " WHERE " + strings.Join(conditions, " AND ")
-	}
-	base += " ORDER BY created_at DESC"
-	rows, err := s.runner().Query(base, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	cards := make([]domain.Card, 0)
-	for rows.Next() {
-		var card domain.Card
-		if err := rows.Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.IsHidden, &card.ModerationReason, &card.CreatedAt); err != nil {
-			return nil, err
-		}
-		cards = append(cards, card)
-	}
-	return cards, rows.Err()
+func (s *PostgresStore) ListCardsForAdmin(query domain.CardQuery) (domain.CardList, error) {
+	return s.listCardsWithQuery(query, true)
 }
 
 func (s *PostgresStore) SetCardHidden(cardID string, hidden bool, reason string) (domain.Card, error) {
@@ -355,6 +270,138 @@ func (s *PostgresStore) SetCardHidden(cardID string, hidden bool, reason string)
 		return domain.Card{}, err
 	}
 	return s.GetCard(cardID)
+}
+
+func (s *PostgresStore) listCardsWithQuery(query domain.CardQuery, admin bool) (domain.CardList, error) {
+	query = normalizeCardQuery(query)
+
+	conditions, args := buildCardConditions(query, admin)
+	where := ""
+	if len(conditions) > 0 {
+		where = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	countSQL := "SELECT COUNT(*) FROM cards" + where
+	var total int64
+	if err := s.runner().QueryRow(countSQL, args...).Scan(&total); err != nil {
+		return domain.CardList{}, err
+	}
+
+	listArgs := append([]interface{}{}, args...)
+	listArgs = append(listArgs, query.Limit, query.Offset)
+	sqlQuery := `SELECT id, author_id, card_type, kind, title, description, price, tags, is_published, is_hidden, moderation_reason, created_at
+		FROM cards` + where + buildCardOrderBy(query) +
+		fmt.Sprintf(" LIMIT $%d OFFSET $%d", len(listArgs)-1, len(listArgs))
+	rows, err := s.runner().Query(sqlQuery, listArgs...)
+	if err != nil {
+		return domain.CardList{}, err
+	}
+	defer rows.Close()
+
+	items := make([]domain.Card, 0)
+	for rows.Next() {
+		var card domain.Card
+		if err := rows.Scan(&card.ID, &card.AuthorID, &card.CardType, &card.Kind, &card.Title, &card.Description, &card.Price, pq.Array(&card.Tags), &card.IsPublished, &card.IsHidden, &card.ModerationReason, &card.CreatedAt); err != nil {
+			return domain.CardList{}, err
+		}
+		items = append(items, card)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.CardList{}, err
+	}
+
+	return domain.CardList{
+		Items:  items,
+		Total:  total,
+		Limit:  query.Limit,
+		Offset: query.Offset,
+	}, nil
+}
+
+func normalizeCardQuery(query domain.CardQuery) domain.CardQuery {
+	if query.Limit <= 0 {
+		query.Limit = 20
+	}
+	if query.Limit > 100 {
+		query.Limit = 100
+	}
+	if query.Offset < 0 {
+		query.Offset = 0
+	}
+	query.SortBy = strings.ToLower(strings.TrimSpace(query.SortBy))
+	if query.SortBy != "price" && query.SortBy != "created_at" {
+		query.SortBy = "created_at"
+	}
+	query.SortOrder = strings.ToLower(strings.TrimSpace(query.SortOrder))
+	if query.SortOrder != "asc" {
+		query.SortOrder = "desc"
+	}
+	query.Query = strings.TrimSpace(query.Query)
+	query.Tag = strings.TrimSpace(query.Tag)
+	query.AuthorID = strings.TrimSpace(query.AuthorID)
+	query.Visibility = strings.ToLower(strings.TrimSpace(query.Visibility))
+	return query
+}
+
+func buildCardConditions(query domain.CardQuery, admin bool) ([]string, []interface{}) {
+	conditions := make([]string, 0, 10)
+	args := make([]interface{}, 0, 10)
+
+	if admin {
+		switch query.Visibility {
+		case "hidden":
+			conditions = append(conditions, "is_hidden = TRUE")
+		case "visible":
+			conditions = append(conditions, "is_hidden = FALSE")
+		}
+	} else {
+		conditions = append(conditions, "is_hidden = FALSE")
+		conditions = append(conditions, "is_published = TRUE")
+	}
+
+	if query.CardType != "" {
+		args = append(args, string(query.CardType))
+		conditions = append(conditions, fmt.Sprintf("card_type = $%d", len(args)))
+	}
+	if query.Kind != "" {
+		args = append(args, string(query.Kind))
+		conditions = append(conditions, fmt.Sprintf("kind = $%d", len(args)))
+	}
+	if query.AuthorID != "" {
+		args = append(args, query.AuthorID)
+		conditions = append(conditions, fmt.Sprintf("author_id = $%d", len(args)))
+	}
+	if query.MinPrice != nil {
+		args = append(args, *query.MinPrice)
+		conditions = append(conditions, fmt.Sprintf("price >= $%d", len(args)))
+	}
+	if query.MaxPrice != nil {
+		args = append(args, *query.MaxPrice)
+		conditions = append(conditions, fmt.Sprintf("price <= $%d", len(args)))
+	}
+	if query.Tag != "" {
+		args = append(args, query.Tag)
+		conditions = append(conditions, fmt.Sprintf("$%d = ANY(tags)", len(args)))
+	}
+	if query.IsPublished != nil {
+		args = append(args, *query.IsPublished)
+		conditions = append(conditions, fmt.Sprintf("is_published = $%d", len(args)))
+	}
+	if query.Query != "" {
+		args = append(args, query.Query)
+		idx := len(args)
+		conditions = append(conditions, fmt.Sprintf("(to_tsvector('simple'::regconfig, COALESCE(title, '') || ' ' || COALESCE(description, '')) @@ websearch_to_tsquery('simple'::regconfig, $%d) OR LOWER(title) LIKE '%%' || LOWER($%d) || '%%' OR LOWER(description) LIKE '%%' || LOWER($%d) || '%%' OR EXISTS (SELECT 1 FROM unnest(tags) tag WHERE LOWER(tag) LIKE '%%' || LOWER($%d) || '%%'))", idx, idx, idx, idx))
+	}
+	return conditions, args
+}
+
+func buildCardOrderBy(query domain.CardQuery) string {
+	switch query.SortBy {
+	case "price":
+		return fmt.Sprintf(" ORDER BY price %s, created_at DESC", strings.ToUpper(query.SortOrder))
+	default:
+		return fmt.Sprintf(" ORDER BY created_at %s", strings.ToUpper(query.SortOrder))
+	}
 }
 
 func (s *PostgresStore) CreateMedia(media domain.MediaFile) (domain.MediaFile, error) {

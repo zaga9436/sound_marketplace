@@ -82,16 +82,16 @@ func (s *CardService) Update(actor domain.User, cardID string, payload domain.Ca
 	return updated, nil
 }
 
-func (s *CardService) List(cardType, query string) ([]domain.Card, error) {
-	cards, err := s.store.ListCards(cardType, query)
+func (s *CardService) List(query domain.CardQuery) (domain.CardList, error) {
+	cards, err := s.store.ListCards(query)
 	if err != nil {
-		return nil, err
+		return domain.CardList{}, err
 	}
-	if err := s.attachPreviewURLs(context.Background(), cards); err != nil {
-		return nil, err
+	if err := s.attachPreviewURLs(context.Background(), cards.Items); err != nil {
+		return domain.CardList{}, err
 	}
-	if cards == nil {
-		return []domain.Card{}, nil
+	if cards.Items == nil {
+		cards.Items = []domain.Card{}
 	}
 	return cards, nil
 }

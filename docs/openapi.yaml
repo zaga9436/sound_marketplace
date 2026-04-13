@@ -91,15 +91,23 @@ paths:
       summary: List public cards by profile owner
       parameters:
         - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/CardTypeQuery'
+        - $ref: '#/components/parameters/KindQuery'
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/TagQuery'
+        - $ref: '#/components/parameters/MinPriceQuery'
+        - $ref: '#/components/parameters/MaxPriceQuery'
+        - $ref: '#/components/parameters/SortByQuery'
+        - $ref: '#/components/parameters/SortOrderQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
       responses:
         '200':
           description: Public cards
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Card'
+                $ref: '#/components/schemas/CardListResponse'
   /profiles/{id}/reviews:
     get:
       summary: List public verified reviews about user
@@ -137,24 +145,24 @@ paths:
     get:
       summary: List cards
       parameters:
-        - in: query
-          name: card_type
-          schema:
-            type: string
-            enum: [offer, request]
-        - in: query
-          name: q
-          schema:
-            type: string
+        - $ref: '#/components/parameters/CardTypeQuery'
+        - $ref: '#/components/parameters/KindQuery'
+        - $ref: '#/components/parameters/AuthorIDQuery'
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/TagQuery'
+        - $ref: '#/components/parameters/MinPriceQuery'
+        - $ref: '#/components/parameters/MaxPriceQuery'
+        - $ref: '#/components/parameters/SortByQuery'
+        - $ref: '#/components/parameters/SortOrderQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
       responses:
         '200':
           description: Cards
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Card'
+                $ref: '#/components/schemas/CardListResponse'
     post:
       summary: Create card
       security:
@@ -709,29 +717,33 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - in: query
-          name: card_type
-          schema:
-            type: string
-            enum: [offer, request]
-        - in: query
-          name: q
-          schema:
-            type: string
+        - $ref: '#/components/parameters/CardTypeQuery'
+        - $ref: '#/components/parameters/KindQuery'
+        - $ref: '#/components/parameters/AuthorIDQuery'
+        - $ref: '#/components/parameters/SearchQuery'
+        - $ref: '#/components/parameters/TagQuery'
+        - $ref: '#/components/parameters/MinPriceQuery'
+        - $ref: '#/components/parameters/MaxPriceQuery'
+        - $ref: '#/components/parameters/SortByQuery'
+        - $ref: '#/components/parameters/SortOrderQuery'
+        - $ref: '#/components/parameters/LimitQuery'
+        - $ref: '#/components/parameters/OffsetQuery'
         - in: query
           name: visibility
           schema:
             type: string
             enum: [visible, hidden]
+        - in: query
+          name: is_published
+          schema:
+            type: boolean
       responses:
         '200':
           description: Cards
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Card'
+                $ref: '#/components/schemas/CardListResponse'
   /admin/cards/{id}:
     get:
       summary: Get card for moderation
@@ -881,6 +893,67 @@ components:
       required: true
       schema:
         type: string
+    CardTypeQuery:
+      in: query
+      name: card_type
+      schema:
+        type: string
+        enum: [offer, request]
+    KindQuery:
+      in: query
+      name: kind
+      schema:
+        type: string
+        enum: [product, service]
+    AuthorIDQuery:
+      in: query
+      name: author_id
+      schema:
+        type: string
+    SearchQuery:
+      in: query
+      name: q
+      schema:
+        type: string
+    TagQuery:
+      in: query
+      name: tag
+      schema:
+        type: string
+    MinPriceQuery:
+      in: query
+      name: min_price
+      schema:
+        type: integer
+        format: int64
+    MaxPriceQuery:
+      in: query
+      name: max_price
+      schema:
+        type: integer
+        format: int64
+    SortByQuery:
+      in: query
+      name: sort_by
+      schema:
+        type: string
+        enum: [created_at, price]
+    SortOrderQuery:
+      in: query
+      name: sort_order
+      schema:
+        type: string
+        enum: [asc, desc]
+    LimitQuery:
+      in: query
+      name: limit
+      schema:
+        type: integer
+    OffsetQuery:
+      in: query
+      name: offset
+      schema:
+        type: integer
   schemas:
     AuthRequest:
       type: object
@@ -979,6 +1052,20 @@ components:
         created_at:
           type: string
           format: date-time
+    CardListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Card'
+        total:
+          type: integer
+          format: int64
+        limit:
+          type: integer
+        offset:
+          type: integer
     MediaFile:
       type: object
       properties:
