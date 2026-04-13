@@ -151,6 +151,19 @@ export interface DownloadResponse {
   url: string;
 }
 
+export interface Deliverable {
+  id: string;
+  order_id: string;
+  uploaded_by: string;
+  storage_key: string;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  version: number;
+  is_active: boolean;
+  created_at: string;
+}
+
 export interface BidCreatePayload {
   price: number;
   message: string;
@@ -168,6 +181,28 @@ export interface NotificationItem {
 export interface NotificationListResponse {
   items: NotificationItem[];
   unread_count: number;
+}
+
+export interface Payment {
+  id: string;
+  user_id: string;
+  external_id: string;
+  amount: number;
+  status: string;
+  provider: string;
+  redirect_url: string;
+  confirmation_url?: string;
+  callback_data?: string;
+  created_at: string;
+}
+
+export interface BalanceResponse {
+  balance: number;
+}
+
+export interface PaymentSyncResponse {
+  payment: Payment;
+  deposit_created: boolean;
 }
 
 export interface ApiErrorPayload {

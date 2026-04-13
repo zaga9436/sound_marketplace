@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const protectedPrefixes = ["/dashboard", "/orders", "/profile", "/chats", "/notifications", "/settings"];
+const protectedPrefixes = ["/dashboard", "/orders", "/profile", "/chats", "/notifications", "/settings", "/balance"];
 const adminPrefixes = ["/admin"];
 
 export function middleware(request: NextRequest) {
@@ -41,6 +41,7 @@ export const config = {
     "/profile/:path*",
     "/chats/:path*",
     "/notifications/:path*",
+    "/balance/:path*",
     "/settings/:path*",
     "/admin/:path*",
     "/cards/:path*",

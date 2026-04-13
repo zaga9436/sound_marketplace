@@ -1,9 +1,10 @@
 "use client";
 
+import type { ComponentType } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, LayoutDashboard, LogOut, MessageSquare, Package2, PlusCircle, Shield, ShoppingBag, UserRound } from "lucide-react";
+import { Bell, CreditCard, LayoutDashboard, LogOut, MessageSquare, Package2, PlusCircle, Shield, ShoppingBag, UserRound } from "lucide-react";
 
 import { notificationsApi } from "@/entities/notification/api/notifications";
 import { useAuthStore } from "@/lib/auth/session-store";
@@ -14,7 +15,7 @@ import { cn } from "@/shared/utils/cn";
 type NavItem = {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   roles?: Array<"customer" | "engineer" | "admin">;
 };
 
@@ -23,6 +24,7 @@ const items: NavItem[] = [
   { href: "/catalog", label: "Каталог", icon: ShoppingBag, roles: ["customer", "engineer"] },
   { href: "/cards/new", label: "Новая карточка", icon: PlusCircle, roles: ["customer", "engineer"] },
   { href: "/orders", label: "Заказы", icon: Package2, roles: ["customer", "engineer", "admin"] },
+  { href: "/balance", label: "Баланс", icon: CreditCard, roles: ["customer", "engineer", "admin"] },
   { href: "/chats", label: "Чаты", icon: MessageSquare, roles: ["customer", "engineer", "admin"] },
   { href: "/notifications", label: "Уведомления", icon: Bell, roles: ["customer", "engineer", "admin"] },
   { href: "/profile", label: "Профиль", icon: UserRound, roles: ["customer", "engineer", "admin"] },
@@ -35,6 +37,7 @@ export function RoleNavigation() {
   const user = useAuthStore((state) => state.user);
   const profile = useAuthStore((state) => state.profile);
   const logout = useAuthStore((state) => state.logout);
+
   const notificationsQuery = useQuery({
     queryKey: ["notifications"],
     queryFn: () => notificationsApi.list(20),

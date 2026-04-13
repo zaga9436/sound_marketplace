@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { cardsApi } from "@/entities/card/api/cards";
 import { CardPreview } from "@/entities/card/ui/card-preview";
+import { paymentsApi } from "@/entities/payment/api/payments";
 import { profilesApi } from "@/entities/profile/api/profiles";
 import { useAuthStore } from "@/lib/auth/session-store";
 import { Badge } from "@/shared/ui/badge";
@@ -17,12 +18,26 @@ function createCardHref(role?: string | null) {
   return "/cards/new";
 }
 
+function formatPrice(value: number) {
+  return new Intl.NumberFormat("ru-RU", {
+    style: "currency",
+    currency: "RUB",
+    maximumFractionDigits: 0
+  }).format(value);
+}
+
 export function DashboardOverview() {
   const user = useAuthStore((state) => state.user);
 
   const profileQuery = useQuery({
     queryKey: ["profile", "me"],
     queryFn: () => profilesApi.me(),
+    enabled: Boolean(user)
+  });
+
+  const balanceQuery = useQuery({
+    queryKey: ["balance"],
+    queryFn: () => paymentsApi.getBalance(),
     enabled: Boolean(user)
   });
 
@@ -54,7 +69,7 @@ export function DashboardOverview() {
             <div className="space-y-2">
               <CardTitle className="text-3xl text-slate-950">С возвращением, {profile?.display_name || user?.email || "пользователь"}.</CardTitle>
               <CardDescription className="max-w-2xl text-base leading-7 text-slate-600">
-                Отсюда удобно обновлять профиль, создавать карточки и переходить к ключевым сценариям SoundMarket: откликам, заказам и сделкам.
+                Отсюда удобно обновлять профиль, создавать карточки, следить за заказами и быстро переходить к деньгам, чатам и сделкам.
               </CardDescription>
             </div>
           </CardHeader>
@@ -67,6 +82,9 @@ export function DashboardOverview() {
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100">
               <Link href="/orders">Мои заказы</Link>
+            </Button>
+            <Button asChild variant="outline" size="lg" className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100">
+              <Link href="/balance">Баланс</Link>
             </Button>
             {canCreateCards ? (
               <Button asChild variant="secondary" size="lg" className="rounded-2xl bg-slate-100 text-slate-900 hover:bg-slate-200">
@@ -96,6 +114,10 @@ export function DashboardOverview() {
             <div>
               <p className="text-sm text-slate-500">Публичные карточки</p>
               <p className="text-lg font-semibold text-slate-950">{cardsQuery.data?.total ?? 0}</p>
+            </div>
+            <div>
+              <p className="text-sm text-slate-500">Баланс</p>
+              <p className="text-lg font-semibold text-slate-950">{balanceQuery.data ? formatPrice(balanceQuery.data.balance) : "—"}</p>
             </div>
           </CardContent>
         </Card>

@@ -13,7 +13,7 @@ import { Label } from "@/shared/ui/label";
 import { Textarea } from "@/shared/ui/textarea";
 
 const schema = z.object({
-  rating: z.coerce.number().int().min(1, "Оценка от 1 до 5.").max(5, "Оценка от 1 до 5."),
+  rating: z.coerce.number().int().min(1, "Оценка должна быть от 1 до 5.").max(5, "Оценка должна быть от 1 до 5."),
   text: z.string().min(3, "Добавьте короткий отзыв.")
 });
 
@@ -50,7 +50,7 @@ export function ReviewForm({ orderId, targetUserId }: { orderId: string; targetU
       </div>
       <div className="space-y-2">
         <Label htmlFor="review-text">Отзыв</Label>
-        <Textarea id="review-text" className="rounded-2xl border-slate-300" placeholder="Опишите, как прошла работа и что понравилось." {...form.register("text")} />
+        <Textarea id="review-text" className="rounded-2xl border-slate-300" placeholder="Опишите, как прошла работа и что вам понравилось." {...form.register("text")} />
         {form.formState.errors.text ? <p className="text-sm text-red-600">{form.formState.errors.text.message}</p> : null}
       </div>
       {mutation.isError ? <p className="text-sm text-red-600">{getErrorMessage(mutation.error)}</p> : null}

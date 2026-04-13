@@ -88,7 +88,7 @@ export function OrdersPage() {
                   </div>
                   <CardTitle className="text-2xl">Заказ на {formatPrice(order.amount)}</CardTitle>
                   <CardDescription className="text-sm text-slate-500">
-                    Создан {new Date(order.created_at).toLocaleDateString("ru-RU")} • customer {order.customer_id} • engineer {order.engineer_id}
+                    Создан {new Date(order.created_at).toLocaleDateString("ru-RU")} • заказчик {order.customer_id} • исполнитель {order.engineer_id}
                   </CardDescription>
                 </div>
                 <Button asChild className="rounded-2xl bg-slate-900 text-white hover:bg-slate-800">
@@ -98,7 +98,7 @@ export function OrdersPage() {
               <CardContent className="grid gap-4 md:grid-cols-3">
                 <div>
                   <p className="text-sm text-slate-500">Источник</p>
-                  <p className="text-sm font-medium text-slate-900">{order.card_id ? `Offer ${order.card_id}` : order.request_id ? `Request ${order.request_id}` : "Сделка"}</p>
+                  <p className="text-sm font-medium text-slate-900">{order.card_id ? `Карточка ${order.card_id}` : order.request_id ? `Запрос ${order.request_id}` : "Сделка"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">Последнее обновление</p>
