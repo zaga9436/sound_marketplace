@@ -3,21 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, Waves } from "lucide-react";
 
-import { useCardCover } from "@/lib/cards/card-cover-store";
 import { cn } from "@/shared/utils/cn";
 
 type AudioCoverPreviewProps = {
-  cardId: string;
+  coverUrl?: string;
   audioUrl?: string;
   title: string;
   compact?: boolean;
   className?: string;
 };
 
-export function AudioCoverPreview({ cardId, audioUrl, title, compact = false, className }: AudioCoverPreviewProps) {
+export function AudioCoverPreview({ coverUrl, audioUrl, title, compact = false, className }: AudioCoverPreviewProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const cover = useCardCover(cardId);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -57,16 +55,16 @@ export function AudioCoverPreview({ cardId, audioUrl, title, compact = false, cl
         className
       )}
       style={
-        cover
+        coverUrl
           ? {
-              backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.18), rgba(15,23,42,0.82)), url(${cover.dataUrl})`,
+              backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.18), rgba(15,23,42,0.82)), url(${coverUrl})`,
               backgroundSize: "cover",
               backgroundPosition: "center"
             }
           : undefined
       }
     >
-      {!cover ? (
+      {!coverUrl ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(148,163,184,0.24),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.18),transparent_22%)]" />
       ) : null}
 
@@ -76,10 +74,10 @@ export function AudioCoverPreview({ cardId, audioUrl, title, compact = false, cl
             <Waves className="h-3.5 w-3.5" />
             Аудио preview
           </div>
-          {cover ? <div className="rounded-full bg-black/25 px-3 py-1 text-xs backdrop-blur">С обложкой</div> : null}
+          {coverUrl ? <div className="rounded-full bg-black/25 px-3 py-1 text-xs backdrop-blur">С обложкой</div> : null}
         </div>
 
-        <div className="space-y-3">
+        <div className={compact ? "space-y-1" : "space-y-2"}>
           <button
             type="button"
             onClick={togglePlayback}

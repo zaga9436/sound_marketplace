@@ -22,7 +22,7 @@ export function CardPreview({ card }: { card: Card }) {
     <Link href={`/cards/${card.id}`} className="block">
       <UICard className="h-full overflow-hidden border-slate-200/80 bg-white/95 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.28)] transition-transform hover:-translate-y-1">
         <div className="p-3 pb-0">
-          <AudioCoverPreview cardId={card.id} audioUrl={preview} title={card.title} compact />
+          <AudioCoverPreview coverUrl={card.cover_url} audioUrl={preview} title={card.title} compact />
         </div>
 
         <CardHeader className="space-y-3">

@@ -54,7 +54,7 @@ export function CardDetail({ id }: { id: string }) {
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1.35fr)_380px]">
         <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.32)]">
           <div className="p-4 pb-0">
-            <AudioCoverPreview cardId={card.id} audioUrl={card.preview_urls?.[0]} title={card.title} className="aspect-[16/9]" />
+            <AudioCoverPreview coverUrl={card.cover_url} audioUrl={card.preview_urls?.[0]} title={card.title} className="aspect-[16/9]" />
           </div>
           <CardHeader className="space-y-4">
             <div className="flex flex-wrap gap-2">

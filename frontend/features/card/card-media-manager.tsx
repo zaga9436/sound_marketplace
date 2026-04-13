@@ -2,7 +2,7 @@
 
 import { ChangeEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AudioLines, FileAudio, LockKeyhole, UploadCloud } from "lucide-react";
+import { AudioLines, FileAudio, ImagePlus, LockKeyhole, UploadCloud } from "lucide-react";
 
 import { cardsApi } from "@/entities/card/api/cards";
 import { getErrorMessage } from "@/lib/api/errors";
@@ -33,11 +33,13 @@ function createFileFormData(file: File) {
 
 type CardMediaManagerProps = {
   cardId: string;
+  coverUrl?: string;
   previewUrls: string[];
 };
 
-export function CardMediaManager({ cardId, previewUrls }: CardMediaManagerProps) {
+export function CardMediaManager({ cardId, coverUrl, previewUrls }: CardMediaManagerProps) {
   const queryClient = useQueryClient();
+  const [coverUpload, setCoverUpload] = useState<MediaFile | null>(null);
   const [previewUpload, setPreviewUpload] = useState<MediaFile | null>(null);
   const [fullUpload, setFullUpload] = useState<MediaFile | null>(null);
 
@@ -47,13 +49,26 @@ export function CardMediaManager({ cardId, previewUrls }: CardMediaManagerProps)
     retry: false
   });
 
+  const invalidateCardQueries = async () => {
+    await queryClient.invalidateQueries({
+      predicate: (query) => Array.isArray(query.queryKey) && query.queryKey.some((part) => part === "card" || part === "cards")
+    });
+    await queryClient.invalidateQueries({ queryKey: ["card", cardId, "full-download"] });
+  };
+
+  const coverMutation = useMutation({
+    mutationFn: (file: File) => cardsApi.uploadCover(cardId, createFileFormData(file)),
+    onSuccess: async (media) => {
+      setCoverUpload(media);
+      await invalidateCardQueries();
+    }
+  });
+
   const previewMutation = useMutation({
     mutationFn: (file: File) => cardsApi.uploadPreview(cardId, createFileFormData(file)),
     onSuccess: async (media) => {
       setPreviewUpload(media);
-      await queryClient.invalidateQueries({
-        predicate: (query) => Array.isArray(query.queryKey) && query.queryKey.some((part) => part === "card" || part === "cards")
-      });
+      await invalidateCardQueries();
     }
   });
 
@@ -61,15 +76,18 @@ export function CardMediaManager({ cardId, previewUrls }: CardMediaManagerProps)
     mutationFn: (file: File) => cardsApi.uploadFull(cardId, createFileFormData(file)),
     onSuccess: async (media) => {
       setFullUpload(media);
-      await queryClient.invalidateQueries({
-        predicate: (query) => Array.isArray(query.queryKey) && query.queryKey.some((part) => part === "card" || part === "cards")
-      });
-      await queryClient.invalidateQueries({ queryKey: ["card", cardId, "full-download"] });
+      await invalidateCardQueries();
     }
   });
 
   const previewUrl = previewUrls[0];
   const hasFullDownload = fullDownloadQuery.isSuccess && Boolean(fullDownloadQuery.data?.url);
+
+  const coverStatusText = useMemo(() => {
+    if (coverMutation.isPending) return "Загружаем новую обложку...";
+    if (coverMutation.isSuccess) return "Обложка успешно обновлена и сразу доступна в карточке.";
+    return coverUrl ? "Обложка уже загружена и используется в каталоге и на странице карточки." : "Обложка пока не загружена.";
+  }, [coverMutation.isPending, coverMutation.isSuccess, coverUrl]);
 
   const previewStatusText = useMemo(() => {
     if (previewMutation.isPending) return "Загружаем preview-файл...";
@@ -85,19 +103,14 @@ export function CardMediaManager({ cardId, previewUrls }: CardMediaManagerProps)
     return "Полный файл пока не загружен.";
   }, [fullDownloadQuery.isFetching, fullMutation.isPending, fullMutation.isSuccess, hasFullDownload]);
 
-  const handlePreviewFile = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    previewMutation.mutate(file);
-    event.target.value = "";
-  };
-
-  const handleFullFile = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    fullMutation.mutate(file);
-    event.target.value = "";
-  };
+  const handleFile =
+    (callback: (file: File) => void) =>
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      callback(file);
+      event.target.value = "";
+    };
 
   return (
     <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.32)]">
@@ -109,13 +122,56 @@ export function CardMediaManager({ cardId, previewUrls }: CardMediaManagerProps)
           <Badge variant="outline">SoundMarket</Badge>
         </div>
         <div className="space-y-2">
-          <CardTitle className="text-2xl text-slate-950">Preview и приватный исходник</CardTitle>
+          <CardTitle className="text-2xl text-slate-950">Обложка, preview и приватный исходник</CardTitle>
           <CardDescription className="max-w-3xl text-base leading-7 text-slate-600">
-            Сначала спокойно сохраняем карточку, потом добавляем медиа. Preview помогает показать работу в каталоге, а полный файл остается приватным.
+            Обложка и preview работают как публичная витрина карточки. Полный файл остается приватным и открывается только по
+            защищенной ссылке.
           </CardDescription>
         </div>
       </CardHeader>
-      <CardContent className="grid gap-6 p-6 lg:grid-cols-2">
+
+      <CardContent className="grid gap-6 p-6 xl:grid-cols-3">
+        <section className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
+              <ImagePlus className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-950">Обложка карточки</h3>
+              <p className="text-sm leading-6 text-slate-600">Публичное изображение для каталога, detail page и блока preview.</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
+              {coverUrl ? (
+                <img src={coverUrl} alt="Обложка карточки" className="aspect-[16/10] w-full object-cover" />
+              ) : (
+                <div className="flex aspect-[16/10] items-center justify-center bg-[linear-gradient(145deg,rgba(15,23,42,0.92),rgba(51,65,85,0.88))] px-6 text-center text-sm text-white/80">
+                  Пока без обложки. Добавьте изображение, чтобы карточка выглядела сильнее в каталоге и на detail page.
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+              <p>{coverStatusText}</p>
+              {coverUpload ? (
+                <p className="mt-2 text-slate-500">
+                  Последний файл: {coverUpload.original_filename} • {formatBytes(coverUpload.size_bytes)}
+                </p>
+              ) : null}
+            </div>
+
+            {coverMutation.isError ? <p className="text-sm text-red-600">{getErrorMessage(coverMutation.error)}</p> : null}
+
+            <label className="flex cursor-pointer items-center justify-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
+              <UploadCloud className="h-4 w-4" />
+              {coverMutation.isPending ? "Загрузка..." : coverUrl ? "Обновить обложку" : "Загрузить обложку"}
+              <input type="file" accept="image/*" className="hidden" onChange={handleFile((file) => coverMutation.mutate(file))} disabled={coverMutation.isPending} />
+            </label>
+          </div>
+        </section>
+
         <section className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
@@ -154,7 +210,7 @@ export function CardMediaManager({ cardId, previewUrls }: CardMediaManagerProps)
             <label className="flex cursor-pointer items-center justify-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
               <UploadCloud className="h-4 w-4" />
               {previewMutation.isPending ? "Загрузка..." : "Загрузить preview"}
-              <input type="file" accept="audio/*" className="hidden" onChange={handlePreviewFile} disabled={previewMutation.isPending} />
+              <input type="file" accept="audio/*" className="hidden" onChange={handleFile((file) => previewMutation.mutate(file))} disabled={previewMutation.isPending} />
             </label>
           </div>
         </section>
@@ -196,7 +252,7 @@ export function CardMediaManager({ cardId, previewUrls }: CardMediaManagerProps)
               <label className="flex cursor-pointer items-center justify-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
                 <UploadCloud className="h-4 w-4" />
                 {fullMutation.isPending ? "Загрузка..." : "Загрузить полный файл"}
-                <input type="file" accept="audio/*" className="hidden" onChange={handleFullFile} disabled={fullMutation.isPending} />
+                <input type="file" accept="audio/*" className="hidden" onChange={handleFile((file) => fullMutation.mutate(file))} disabled={fullMutation.isPending} />
               </label>
 
               {hasFullDownload ? (

@@ -33,6 +33,7 @@ export const cardsApi = {
   getById: (id: string) => apiClient.get<Card>(`/cards/${id}`),
   create: (payload: CardPayload) => apiClient.post<Card>("/cards", payload),
   update: (id: string, payload: Omit<CardPayload, "card_type">) => apiClient.put<Card>(`/cards/${id}`, payload),
+  uploadCover: (id: string, formData: FormData) => apiClient.upload<MediaFile>(`/cards/${id}/media/cover`, formData),
   uploadPreview: (id: string, formData: FormData) => apiClient.upload<MediaFile>(`/cards/${id}/media/preview`, formData),
   uploadFull: (id: string, formData: FormData) => apiClient.upload<MediaFile>(`/cards/${id}/media/full`, formData),
   getFullDownloadUrl: (id: string) => apiClient.get<DownloadResponse>(`/cards/${id}/download`)

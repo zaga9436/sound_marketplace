@@ -1,19 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { ChangeEvent, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ImagePlus, Trash2 } from "lucide-react";
 
 import { cardsApi } from "@/entities/card/api/cards";
 import { CardMediaManager } from "@/features/card/card-media-manager";
-import { getErrorMessage } from "@/lib/api/errors";
-import { CardCoverRecord, getCardCover, removeCardCover, saveCardCover } from "@/lib/cards/card-cover-store";
 import { useAuthStore } from "@/lib/auth/session-store";
+import { getErrorMessage } from "@/lib/api/errors";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
@@ -65,7 +63,6 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
   const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const allowedCardType = allowedCardTypeForRole(user?.role);
-  const [coverDraft, setCoverDraft] = useState<CardCoverRecord | null>(null);
 
   const cardQuery = useQuery({
     queryKey: ["card", cardId, "edit"],
@@ -101,11 +98,6 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
   }, [cardQuery.data, form, mode]);
 
   useEffect(() => {
-    if (!cardId || typeof window === "undefined") return;
-    setCoverDraft(getCardCover(cardId));
-  }, [cardId]);
-
-  useEffect(() => {
     if (mode === "create" && allowedCardType) {
       form.setValue("card_type", initialCardType ?? allowedCardType);
     }
@@ -131,9 +123,6 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
       return cardsApi.create(payload);
     },
     onSuccess: async (card) => {
-      if (coverDraft) {
-        saveCardCover(card.id, coverDraft);
-      }
       await queryClient.invalidateQueries({
         predicate: (query) => Array.isArray(query.queryKey) && query.queryKey.some((part) => part === "cards" || part === "card")
       });
@@ -186,37 +175,6 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
   const cardTypeValue = form.watch("card_type");
   const card = cardQuery.data;
 
-  const handleCoverFile = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = typeof reader.result === "string" ? reader.result : "";
-      if (!dataUrl) return;
-
-      const nextCover = {
-        dataUrl,
-        fileName: file.name,
-        updatedAt: new Date().toISOString()
-      };
-
-      setCoverDraft(nextCover);
-      if (cardId) {
-        saveCardCover(cardId, nextCover);
-      }
-    };
-    reader.readAsDataURL(file);
-    event.target.value = "";
-  };
-
-  const clearCover = () => {
-    setCoverDraft(null);
-    if (cardId) {
-      removeCardCover(cardId);
-    }
-  };
-
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.38)]">
@@ -232,7 +190,8 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
               {mode === "create" ? "Создайте карточку для каталога SoundMarket" : "Обновите карточку и медиа"}
             </CardTitle>
             <CardDescription className="max-w-3xl text-base leading-7 text-slate-600">
-              Чистая, понятная карточка помогает пользователю быстрее понять ценность предложения или запроса. После сохранения можно сразу добавить preview и приватный полный файл.
+              Чистая, понятная карточка помогает быстрее показать ценность предложения или запроса. После создания карточки вы
+              сразу перейдете к шагу с обложкой, preview и приватным полным файлом.
             </CardDescription>
           </div>
         </CardHeader>
@@ -241,12 +200,7 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="card_type">Тип карточки</Label>
-                <select
-                  id="card_type"
-                  className={selectClassName}
-                  disabled={mode === "edit" || Boolean(allowedCardType)}
-                  {...form.register("card_type")}
-                >
+                <select id="card_type" className={selectClassName} disabled={mode === "edit" || Boolean(allowedCardType)} {...form.register("card_type")}>
                   <option value="offer">Offer</option>
                   <option value="request">Request</option>
                 </select>
@@ -262,7 +216,6 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
                   <option value="service">Услуга</option>
                   <option value="product">Продукт</option>
                 </select>
-                {form.formState.errors.kind ? <p className="text-sm text-red-600">{form.formState.errors.kind.message}</p> : null}
               </div>
             </div>
 
@@ -286,14 +239,7 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="price">Цена</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  min="1"
-                  step="1"
-                  className="rounded-2xl border-slate-300"
-                  {...form.register("price", { valueAsNumber: true })}
-                />
+                <Input id="price" type="number" min="1" step="1" className="rounded-2xl border-slate-300" {...form.register("price", { valueAsNumber: true })} />
                 <p className="text-sm text-slate-500">Цена передается на backend в целых рублях.</p>
                 {form.formState.errors.price ? <p className="text-sm text-red-600">{form.formState.errors.price.message}</p> : null}
               </div>
@@ -313,6 +259,13 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
               </div>
             </label>
 
+            {mode === "create" ? (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
+                После создания карточки мы сразу переведем вас на экран редактирования, где можно загрузить обложку, preview и
+                приватный полный файл.
+              </div>
+            ) : null}
+
             {mutation.isError ? <p className="text-sm text-red-600">{getErrorMessage(mutation.error)}</p> : null}
 
             <div className="flex flex-wrap gap-3">
@@ -327,51 +280,7 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.26)]">
-        <CardHeader className="space-y-3">
-          <Badge variant="outline">Обложка карточки</Badge>
-          <div className="space-y-2">
-            <CardTitle className="text-2xl text-slate-950">Визуальная обложка</CardTitle>
-            <CardDescription className="text-base leading-7 text-slate-600">
-              Это быстрый и практичный cover image слой для карточки. Он усиливает каталог и detail page, а аудио preview остается отдельным музыкальным уровнем.
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-50">
-            {coverDraft ? (
-              <div className="relative aspect-[16/9]">
-                <img src={coverDraft.dataUrl} alt="Обложка карточки" className="h-full w-full object-cover" />
-              </div>
-            ) : (
-              <div className="flex aspect-[16/9] items-center justify-center bg-[linear-gradient(145deg,rgba(15,23,42,0.92),rgba(51,65,85,0.88))] px-6 text-center text-sm text-white/80">
-                Пока без обложки. Добавьте изображение, чтобы карточка выглядела сильнее в каталоге и на detail page.
-              </div>
-            )}
-          </div>
-
-          {coverDraft ? <p className="text-sm text-slate-500">Текущая обложка: {coverDraft.fileName}</p> : null}
-          {!cardId && coverDraft ? (
-            <p className="text-sm text-slate-500">Обложка сохранится и автоматически привяжется к карточке сразу после создания.</p>
-          ) : null}
-
-          <div className="flex flex-wrap gap-3">
-            <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
-              <ImagePlus className="h-4 w-4" />
-              {coverDraft ? "Обновить обложку" : "Загрузить обложку"}
-              <input type="file" accept="image/*" className="hidden" onChange={handleCoverFile} />
-            </label>
-            {coverDraft ? (
-              <Button type="button" variant="outline" className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100" onClick={clearCover}>
-                <Trash2 className="mr-2 h-4 w-4" />
-                Удалить обложку
-              </Button>
-            ) : null}
-          </div>
-        </CardContent>
-      </Card>
-
-      {mode === "edit" && card ? <CardMediaManager cardId={card.id} previewUrls={card.preview_urls ?? []} /> : null}
+      {mode === "edit" && card ? <CardMediaManager cardId={card.id} coverUrl={card.cover_url} previewUrls={card.preview_urls ?? []} /> : null}
     </div>
   );
 }

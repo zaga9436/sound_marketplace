@@ -33,6 +33,7 @@ export interface Card {
   description: string;
   price: number;
   tags: string[];
+  cover_url?: string;
   preview_urls: string[];
   is_published: boolean;
   is_hidden?: boolean;
@@ -141,7 +142,8 @@ export interface MediaFile {
   original_filename: string;
   content_type: string;
   size_bytes: number;
-  media_role: "preview" | "full";
+  media_role: "cover" | "preview" | "full";
+  url?: string;
   created_at?: string;
 }
 
