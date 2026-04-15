@@ -240,7 +240,7 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
               <div className="space-y-2">
                 <Label htmlFor="price">Цена</Label>
                 <Input id="price" type="number" min="1" step="1" className="rounded-2xl border-slate-300" {...form.register("price", { valueAsNumber: true })} />
-                <p className="text-sm text-slate-500">Цена передается на backend в целых рублях.</p>
+                <p className="text-sm text-slate-500">Укажите итоговую стоимость в рублях.</p>
                 {form.formState.errors.price ? <p className="text-sm text-red-600">{form.formState.errors.price.message}</p> : null}
               </div>
 
@@ -280,7 +280,16 @@ export function CardForm({ mode, cardId, initialCardType }: CardFormProps) {
         </CardContent>
       </Card>
 
-      {mode === "edit" && card ? <CardMediaManager cardId={card.id} coverUrl={card.cover_url} previewUrls={card.preview_urls ?? []} /> : null}
+      {mode === "edit" && card ? (
+        <CardMediaManager
+          cardId={card.id}
+          coverUrl={card.cover_url}
+          previewUrls={card.preview_urls ?? []}
+          cardType={card.card_type}
+          kind={card.kind}
+          role={user?.role}
+        />
+      ) : null}
     </div>
   );
 }

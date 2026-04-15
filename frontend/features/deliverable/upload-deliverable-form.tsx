@@ -6,7 +6,6 @@ import { UploadCloud } from "lucide-react";
 
 import { deliverablesApi } from "@/entities/deliverable/api/deliverables";
 import { getErrorMessage } from "@/lib/api/errors";
-import { Button } from "@/shared/ui/button";
 
 export function UploadDeliverableForm({ orderId }: { orderId: string }) {
   const queryClient = useQueryClient();
@@ -34,10 +33,10 @@ export function UploadDeliverableForm({ orderId }: { orderId: string }) {
       <label className="inline-flex cursor-pointer items-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
         <UploadCloud className="h-4 w-4" />
         {mutation.isPending ? "Загрузка..." : "Загрузить результат"}
-        <input type="file" className="hidden" onChange={handleFile} disabled={mutation.isPending} />
+        <input type="file" accept="audio/*,.zip,application/zip" className="hidden" onChange={handleFile} disabled={mutation.isPending} />
       </label>
 
-      <p className="text-sm leading-6 text-slate-500">Файл будет загружен как новая версия deliverable и останется приватным.</p>
+      <p className="text-sm leading-6 text-slate-500">Можно загрузить аудио или ZIP-архив со stems, проектом и исходниками. Файл останется приватным.</p>
     </div>
   );
 }

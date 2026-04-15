@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
 import { ordersApi } from "@/entities/order/api/orders";
@@ -9,10 +9,13 @@ import { Button } from "@/shared/ui/button";
 
 export function CreateOrderFromBidButton({ bidId }: { bidId: string }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: () => ordersApi.createFromBid(bidId),
-    onSuccess: (order) => {
+    onSuccess: async (order) => {
+      await queryClient.invalidateQueries({ queryKey: ["balance"] });
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
       router.push(`/orders/${order.id}`);
     }
   });
@@ -31,12 +34,23 @@ export function CreateOrderFromBidButton({ bidId }: { bidId: string }) {
   );
 }
 
-export function CreateOrderFromOfferButton({ cardId }: { cardId: string }) {
+export function CreateOrderFromOfferButton({
+  cardId,
+  label = "Создать заказ",
+  pendingLabel = "Создаем заказ..."
+}: {
+  cardId: string;
+  label?: string;
+  pendingLabel?: string;
+}) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const mutation = useMutation({
     mutationFn: () => ordersApi.createFromOffer(cardId),
-    onSuccess: (order) => {
+    onSuccess: async (order) => {
+      await queryClient.invalidateQueries({ queryKey: ["balance"] });
+      await queryClient.invalidateQueries({ queryKey: ["orders"] });
       router.push(`/orders/${order.id}`);
     }
   });
@@ -49,7 +63,7 @@ export function CreateOrderFromOfferButton({ cardId }: { cardId: string }) {
         className="rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
         disabled={mutation.isPending}
       >
-        {mutation.isPending ? "Создаем заказ..." : "Создать заказ"}
+        {mutation.isPending ? pendingLabel : label}
       </Button>
     </div>
   );

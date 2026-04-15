@@ -99,8 +99,8 @@ export function CatalogToolbar() {
                 <option value="price">По цене</option>
               </select>
               <select value={filters.sortOrder} onChange={(event) => updateSearch({ sort_order: event.target.value })} className={selectClassName}>
-                <option value="desc">По убыванию</option>
-                <option value="asc">По возрастанию</option>
+                <option value="desc">Сначала новые</option>
+                <option value="asc">Сначала старые</option>
               </select>
             </div>
           </div>
@@ -116,7 +116,7 @@ export function CatalogToolbar() {
             <Input id="max_price" type="number" defaultValue={filters.maxPrice} className="rounded-2xl border-slate-300" onBlur={(event) => updateSearch({ max_price: event.target.value })} placeholder="50000" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="limit">Карточек на страницу</Label>
+            <Label htmlFor="limit">Карточек на странице</Label>
             <select id="limit" value={filters.limit} onChange={(event) => updateSearch({ limit: event.target.value })} className={selectClassName}>
               <option value="12">12</option>
               <option value="24">24</option>
@@ -127,7 +127,7 @@ export function CatalogToolbar() {
 
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <SlidersHorizontal className="h-4 w-4" />
-          Поиск, фильтры, сортировка и пагинация уже работают на реальном backend API.
+          Подберите карточки по формату, цене, тегам и свежести публикации.
         </div>
       </CardContent>
     </Card>

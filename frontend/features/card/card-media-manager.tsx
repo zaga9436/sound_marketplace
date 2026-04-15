@@ -2,14 +2,14 @@
 
 import { ChangeEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AudioLines, FileAudio, ImagePlus, LockKeyhole, UploadCloud } from "lucide-react";
+import { Archive, AudioLines, FileAudio, ImagePlus, LockKeyhole, UploadCloud } from "lucide-react";
 
 import { cardsApi } from "@/entities/card/api/cards";
 import { getErrorMessage } from "@/lib/api/errors";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { MediaFile } from "@/shared/types/api";
+import { CardKind, CardType, MediaFile, Role } from "@/shared/types/api";
 
 function formatBytes(size: number) {
   if (!size) return "0 Б";
@@ -35,18 +35,31 @@ type CardMediaManagerProps = {
   cardId: string;
   coverUrl?: string;
   previewUrls: string[];
+  cardType: CardType;
+  kind: CardKind;
+  role?: Role;
 };
 
-export function CardMediaManager({ cardId, coverUrl, previewUrls }: CardMediaManagerProps) {
+export function CardMediaManager({ cardId, coverUrl, previewUrls, cardType, kind, role }: CardMediaManagerProps) {
   const queryClient = useQueryClient();
   const [coverUpload, setCoverUpload] = useState<MediaFile | null>(null);
   const [previewUpload, setPreviewUpload] = useState<MediaFile | null>(null);
   const [fullUpload, setFullUpload] = useState<MediaFile | null>(null);
+  const [materialUpload, setMaterialUpload] = useState<MediaFile | null>(null);
+  const showProductMedia = role === "engineer" && cardType === "offer" && kind === "product";
+  const showRequestMaterials = cardType === "request";
 
   const fullDownloadQuery = useQuery({
     queryKey: ["card", cardId, "full-download"],
     queryFn: () => cardsApi.getFullDownloadUrl(cardId),
-    retry: false
+    retry: false,
+    enabled: showProductMedia
+  });
+
+  const materialsQuery = useQuery({
+    queryKey: ["card", cardId, "materials"],
+    queryFn: () => cardsApi.listMaterials(cardId),
+    enabled: showRequestMaterials
   });
 
   const invalidateCardQueries = async () => {
@@ -54,6 +67,7 @@ export function CardMediaManager({ cardId, coverUrl, previewUrls }: CardMediaMan
       predicate: (query) => Array.isArray(query.queryKey) && query.queryKey.some((part) => part === "card" || part === "cards")
     });
     await queryClient.invalidateQueries({ queryKey: ["card", cardId, "full-download"] });
+    await queryClient.invalidateQueries({ queryKey: ["card", cardId, "materials"] });
   };
 
   const coverMutation = useMutation({
@@ -80,13 +94,21 @@ export function CardMediaManager({ cardId, coverUrl, previewUrls }: CardMediaMan
     }
   });
 
+  const materialMutation = useMutation({
+    mutationFn: (file: File) => cardsApi.uploadMaterials(cardId, createFileFormData(file)),
+    onSuccess: async (media) => {
+      setMaterialUpload(media);
+      await invalidateCardQueries();
+    }
+  });
+
   const previewUrl = previewUrls[0];
   const hasFullDownload = fullDownloadQuery.isSuccess && Boolean(fullDownloadQuery.data?.url);
 
   const coverStatusText = useMemo(() => {
     if (coverMutation.isPending) return "Загружаем новую обложку...";
     if (coverMutation.isSuccess) return "Обложка успешно обновлена и сразу доступна в карточке.";
-    return coverUrl ? "Обложка уже загружена и используется в каталоге и на странице карточки." : "Обложка пока не загружена.";
+    return coverUrl ? "Обложка уже загружена и используется в каталоге, профиле и на странице карточки." : "Обложка пока не загружена.";
   }, [coverMutation.isPending, coverMutation.isSuccess, coverUrl]);
 
   const previewStatusText = useMemo(() => {
@@ -98,7 +120,7 @@ export function CardMediaManager({ cardId, coverUrl, previewUrls }: CardMediaMan
   const fullStatusText = useMemo(() => {
     if (fullMutation.isPending) return "Загружаем полный файл...";
     if (fullMutation.isSuccess) return "Полный файл успешно загружен.";
-    if (hasFullDownload) return "Полный файл загружен и доступен по приватной ссылке.";
+    if (hasFullDownload) return "Полный файл загружен и доступен по приватной ссылке владельцу карточки.";
     if (fullDownloadQuery.isFetching) return "Проверяем наличие полного файла...";
     return "Полный файл пока не загружен.";
   }, [fullDownloadQuery.isFetching, fullMutation.isPending, fullMutation.isSuccess, hasFullDownload]);
@@ -119,18 +141,23 @@ export function CardMediaManager({ cardId, coverUrl, previewUrls }: CardMediaMan
           <Badge className="bg-slate-900/90 text-white hover:bg-slate-900" variant="secondary">
             Медиа карточки
           </Badge>
-          <Badge variant="outline">SoundMarket</Badge>
+          <Badge variant="outline">{cardType === "offer" ? "Offer" : "Request"} / {kind === "product" ? "продукт" : "услуга"}</Badge>
         </div>
         <div className="space-y-2">
-          <CardTitle className="text-2xl text-slate-950">Обложка, preview и приватный исходник</CardTitle>
+          <CardTitle className="text-2xl text-slate-950">
+            {showProductMedia ? "Обложка, preview и приватный full-файл" : "Обложка карточки"}
+          </CardTitle>
           <CardDescription className="max-w-3xl text-base leading-7 text-slate-600">
-            Обложка и preview работают как публичная витрина карточки. Полный файл остается приватным и открывается только по
-            защищенной ссылке.
+            {showProductMedia
+              ? "Обложка и preview работают как публичная витрина карточки. Полный файл остается приватным и открывается только по защищенной ссылке."
+              : cardType === "request"
+                ? "Для request-карточек обложка остается публичной, а рабочие материалы хранятся приватно и открываются исполнителю после старта заказа."
+                : "Для карточки услуги оставляем обложку как витрину. Preview и full-файл используются только для готовых музыкальных продуктов."}
           </CardDescription>
         </div>
       </CardHeader>
 
-      <CardContent className="grid gap-6 p-6 xl:grid-cols-3">
+      <CardContent className={`grid gap-6 p-6 ${showProductMedia ? "xl:grid-cols-3" : "xl:grid-cols-[minmax(0,420px)_1fr]"}`}>
         <section className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
@@ -138,7 +165,7 @@ export function CardMediaManager({ cardId, coverUrl, previewUrls }: CardMediaMan
             </div>
             <div>
               <h3 className="text-lg font-semibold text-slate-950">Обложка карточки</h3>
-              <p className="text-sm leading-6 text-slate-600">Публичное изображение для каталога, detail page и блока preview.</p>
+              <p className="text-sm leading-6 text-slate-600">Публичное изображение для каталога, профиля и страницы карточки.</p>
             </div>
           </div>
 
@@ -148,7 +175,7 @@ export function CardMediaManager({ cardId, coverUrl, previewUrls }: CardMediaMan
                 <img src={coverUrl} alt="Обложка карточки" className="aspect-[16/10] w-full object-cover" />
               ) : (
                 <div className="flex aspect-[16/10] items-center justify-center bg-[linear-gradient(145deg,rgba(15,23,42,0.92),rgba(51,65,85,0.88))] px-6 text-center text-sm text-white/80">
-                  Пока без обложки. Добавьте изображение, чтобы карточка выглядела сильнее в каталоге и на detail page.
+                  Пока без обложки. Добавьте изображение, чтобы карточка выглядела сильнее в каталоге.
                 </div>
               )}
             </div>
@@ -172,99 +199,157 @@ export function CardMediaManager({ cardId, coverUrl, previewUrls }: CardMediaMan
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
-              <AudioLines className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-slate-950">Preview-файл</h3>
-              <p className="text-sm leading-6 text-slate-600">Публичный аудио-фрагмент, который увидят посетители карточки.</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {previewUrl ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <audio controls className="w-full">
-                  <source src={previewUrl} />
-                </audio>
+        {!showProductMedia && showRequestMaterials ? (
+          <section className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
+                <Archive className="h-5 w-5" />
               </div>
-            ) : (
+              <div>
+                <h3 className="text-lg font-semibold text-slate-950">Материалы заказчика</h3>
+                <p className="text-sm leading-6 text-slate-600">Дорожки, вокал, бит, архив или исходники для исполнителя.</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
               <div className="rounded-2xl border border-dashed border-slate-300 bg-white/80 p-5 text-sm leading-6 text-slate-600">
-                Preview еще не добавлен. После загрузки он сразу появится здесь и на публичной странице карточки.
+                Preview/full для готового продукта здесь скрыты. Вместо них можно приложить приватные материалы задачи: аудио или ZIP-архив.
+                Исполнитель увидит их после того, как заказ будет взят в работу.
               </div>
-            )}
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
-              <p>{previewStatusText}</p>
-              {previewUpload ? (
-                <p className="mt-2 text-slate-500">
-                  Последний файл: {previewUpload.original_filename} • {formatBytes(previewUpload.size_bytes)}
+              {materialsQuery.data?.length ? (
+                <div className="space-y-2">
+                  {materialsQuery.data.map((material) => (
+                    <div key={material.id} className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                      <p className="font-medium text-slate-950">{material.original_filename}</p>
+                      <p className="mt-1 text-slate-500">{material.content_type} • {formatBytes(material.size_bytes)}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">Материалы пока не загружены.</p>
+              )}
+
+              {materialUpload ? (
+                <p className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                  Загружен файл: {materialUpload.original_filename} • {formatBytes(materialUpload.size_bytes)}
                 </p>
               ) : null}
+
+              {materialMutation.isError ? <p className="text-sm text-red-600">{getErrorMessage(materialMutation.error)}</p> : null}
+
+              <label className="flex cursor-pointer items-center justify-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
+                <UploadCloud className="h-4 w-4" />
+                {materialMutation.isPending ? "Загрузка..." : "Загрузить материалы"}
+                <input type="file" accept="audio/*,.zip,application/zip" className="hidden" onChange={handleFile((file) => materialMutation.mutate(file))} disabled={materialMutation.isPending} />
+              </label>
             </div>
-
-            {previewMutation.isError ? <p className="text-sm text-red-600">{getErrorMessage(previewMutation.error)}</p> : null}
-
-            <label className="flex cursor-pointer items-center justify-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
-              <UploadCloud className="h-4 w-4" />
-              {previewMutation.isPending ? "Загрузка..." : "Загрузить preview"}
-              <input type="file" accept="audio/*" className="hidden" onChange={handleFile((file) => previewMutation.mutate(file))} disabled={previewMutation.isPending} />
-            </label>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
-          <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-200 text-slate-900">
-              <LockKeyhole className="h-5 w-5" />
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-slate-950">Полный файл</h3>
-              <p className="text-sm leading-6 text-slate-600">Приватный исходник. Он не отображается публично и доступен только по защищенной ссылке.</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
-              <div className="flex items-start gap-3">
-                <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-                  <FileAudio className="h-4 w-4" />
+          </section>
+        ) : !showProductMedia ? (
+          <section className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-5">
+            <h3 className="text-lg font-semibold text-slate-950">Для услуги достаточно обложки</h3>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+              Preview и full-файл показываются только для готовых продуктов, например битов или инструменталов. Для услуги важнее описание,
+              портфолио и детали работы.
+            </p>
+          </section>
+        ) : (
+          <>
+            <section className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white">
+                  <AudioLines className="h-5 w-5" />
                 </div>
-                <div className="min-w-0 space-y-2">
-                  <p className="text-sm leading-6 text-slate-700">{fullStatusText}</p>
-                  {fullUpload ? (
-                    <p className="text-sm text-slate-500">
-                      Последний файл: {fullUpload.original_filename} • {formatBytes(fullUpload.size_bytes)}
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-950">Preview-файл</h3>
+                  <p className="text-sm leading-6 text-slate-600">Публичный аудио-фрагмент для прослушивания в карточке.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {previewUrl ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <audio controls className="w-full">
+                      <source src={previewUrl} />
+                    </audio>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-white/80 p-5 text-sm leading-6 text-slate-600">
+                    Preview еще не добавлен. После загрузки он появится здесь и на публичной странице карточки.
+                  </div>
+                )}
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                  <p>{previewStatusText}</p>
+                  {previewUpload ? (
+                    <p className="mt-2 text-slate-500">
+                      Последний файл: {previewUpload.original_filename} • {formatBytes(previewUpload.size_bytes)}
                     </p>
-                  ) : hasFullDownload ? (
-                    <p className="text-sm text-slate-500">Приватная ссылка уже доступна для владельца карточки.</p>
+                  ) : null}
+                </div>
+
+                {previewMutation.isError ? <p className="text-sm text-red-600">{getErrorMessage(previewMutation.error)}</p> : null}
+
+                <label className="flex cursor-pointer items-center justify-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
+                  <UploadCloud className="h-4 w-4" />
+                  {previewMutation.isPending ? "Загрузка..." : "Загрузить preview"}
+                  <input type="file" accept="audio/*" className="hidden" onChange={handleFile((file) => previewMutation.mutate(file))} disabled={previewMutation.isPending} />
+                </label>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-200 text-slate-900">
+                  <LockKeyhole className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-950">Полный файл</h3>
+                  <p className="text-sm leading-6 text-slate-600">Приватный исходник или финальный продукт, доступный только по защищенной ссылке.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+                      <FileAudio className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 space-y-2">
+                      <p className="text-sm leading-6 text-slate-700">{fullStatusText}</p>
+                      {fullUpload ? (
+                        <p className="text-sm text-slate-500">
+                          Последний файл: {fullUpload.original_filename} • {formatBytes(fullUpload.size_bytes)}
+                        </p>
+                      ) : hasFullDownload ? (
+                        <p className="text-sm text-slate-500">Приватная ссылка уже доступна владельцу карточки.</p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+
+                {fullMutation.isError ? <p className="text-sm text-red-600">{getErrorMessage(fullMutation.error)}</p> : null}
+                {fullDownloadQuery.isError ? <p className="text-sm text-slate-500">Пока приватного файла нет, либо он еще не загружен.</p> : null}
+
+                <div className="flex flex-wrap gap-3">
+                  <label className="flex cursor-pointer items-center justify-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
+                    <UploadCloud className="h-4 w-4" />
+                    {fullMutation.isPending ? "Загрузка..." : "Загрузить полный файл"}
+                    <input type="file" accept="audio/*" className="hidden" onChange={handleFile((file) => fullMutation.mutate(file))} disabled={fullMutation.isPending} />
+                  </label>
+
+                  {hasFullDownload ? (
+                    <Button asChild variant="outline" className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100">
+                      <a href={fullDownloadQuery.data.url} target="_blank" rel="noreferrer">
+                        Открыть приватную ссылку
+                      </a>
+                    </Button>
                   ) : null}
                 </div>
               </div>
-            </div>
-
-            {fullMutation.isError ? <p className="text-sm text-red-600">{getErrorMessage(fullMutation.error)}</p> : null}
-            {fullDownloadQuery.isError ? <p className="text-sm text-slate-500">Пока приватного файла нет, либо он еще не загружен.</p> : null}
-
-            <div className="flex flex-wrap gap-3">
-              <label className="flex cursor-pointer items-center justify-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800">
-                <UploadCloud className="h-4 w-4" />
-                {fullMutation.isPending ? "Загрузка..." : "Загрузить полный файл"}
-                <input type="file" accept="audio/*" className="hidden" onChange={handleFile((file) => fullMutation.mutate(file))} disabled={fullMutation.isPending} />
-              </label>
-
-              {hasFullDownload ? (
-                <Button asChild variant="outline" className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100">
-                  <a href={fullDownloadQuery.data.url} target="_blank" rel="noreferrer">
-                    Открыть приватную ссылку
-                  </a>
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </section>
+            </section>
+          </>
+        )}
       </CardContent>
     </Card>
   );

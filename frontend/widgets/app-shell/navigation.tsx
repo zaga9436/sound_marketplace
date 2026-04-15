@@ -10,6 +10,7 @@ import { notificationsApi } from "@/entities/notification/api/notifications";
 import { useAuthStore } from "@/lib/auth/session-store";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
+import { UserAvatar } from "@/shared/ui/user-avatar";
 import { cn } from "@/shared/utils/cn";
 
 type NavItem = {
@@ -31,6 +32,13 @@ const items: NavItem[] = [
   { href: "/admin", label: "Админ", icon: Shield, roles: ["admin"] }
 ];
 
+function roleLabel(role?: string | null) {
+  if (role === "customer") return "Заказчик";
+  if (role === "engineer") return "Инженер";
+  if (role === "admin") return "Администратор";
+  return "Гость";
+}
+
 export function RoleNavigation() {
   const pathname = usePathname();
   const router = useRouter();
@@ -48,12 +56,16 @@ export function RoleNavigation() {
   const visibleItems = items.filter((item) => !item.roles || (user?.role ? item.roles.includes(user.role) : false));
 
   return (
-    <aside className="surface flex h-full flex-col gap-6 p-4">
-      <div className="space-y-2">
-        <Badge>SoundMarket</Badge>
-        <div>
-          <p className="text-sm font-medium text-foreground">{profile?.display_name ?? "Пользователь"}</p>
-          <p className="text-sm text-muted-foreground">{user?.email ?? "guest@example.com"}</p>
+    <aside className="flex h-full flex-col gap-6 rounded-[2rem] border border-slate-200/80 bg-white/95 p-4 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.42)]">
+      <div className="space-y-4 rounded-[1.5rem] bg-slate-50 p-4">
+        <Badge className="bg-slate-950 text-white hover:bg-slate-950">SoundMarket</Badge>
+        <div className="flex items-center gap-3">
+          <UserAvatar name={profile?.display_name} email={user?.email} avatarUrl={profile?.avatar_url} className="h-11 w-11 rounded-2xl" />
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-950">{profile?.display_name ?? "Пользователь"}</p>
+            <p className="truncate text-xs text-slate-500">{user?.email ?? "guest@example.com"}</p>
+            <p className="mt-1 text-xs font-medium text-slate-600">{roleLabel(user?.role)}</p>
+          </div>
         </div>
       </div>
 
@@ -67,14 +79,16 @@ export function RoleNavigation() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                active ? "bg-primary text-primary-foreground" : "text-foreground/70 hover:bg-secondary hover:text-foreground"
+                "flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors",
+                active ? "bg-slate-950 text-white shadow-sm" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"
               )}
             >
               <Icon className="h-4 w-4" />
               <span className="flex-1">{item.label}</span>
               {item.href === "/notifications" && (notificationsQuery.data?.unread_count ?? 0) > 0 ? (
-                <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs text-current">{notificationsQuery.data?.unread_count}</span>
+                <span className={cn("rounded-full px-2 py-0.5 text-xs", active ? "bg-white/20 text-white" : "bg-slate-950 text-white")}>
+                  {notificationsQuery.data?.unread_count}
+                </span>
               ) : null}
             </Link>
           );
@@ -83,6 +97,7 @@ export function RoleNavigation() {
 
       <Button
         variant="outline"
+        className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100"
         onClick={() => {
           logout();
           router.push("/login");

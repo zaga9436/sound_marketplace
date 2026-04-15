@@ -23,6 +23,7 @@ function formatPrice(value: number) {
 export function CardDealPanel({ card }: { card: MarketplaceCard }) {
   const user = useAuthStore((state) => state.user);
   const isOwner = user?.id === card.author_id;
+  const isReadyProduct = card.card_type === "offer" && card.kind === "product";
   const canViewBids = card.card_type === "request" && Boolean(user && (isOwner || user.role === "admin"));
   const canCreateBid = card.card_type === "request" && user?.role === "engineer" && !isOwner;
   const canCreateOrderFromOffer = card.card_type === "offer" && user?.role === "customer" && !isOwner;
@@ -79,24 +80,33 @@ export function CardDealPanel({ card }: { card: MarketplaceCard }) {
         <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
           <CardHeader className="space-y-3">
             <Badge className="bg-slate-900/90 text-white" variant="secondary">
-              Заказ
+              {isReadyProduct ? "Готовый продукт" : "Заказ услуги"}
             </Badge>
-            <CardTitle>Покупка предложения</CardTitle>
+            <CardTitle>{isReadyProduct ? "Покупка готового бита" : "Покупка предложения"}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <p className="text-sm leading-6 text-slate-600">
+              {isReadyProduct
+                ? "Это готовый аудиопродукт: после покупки полный файл открывается через защищенную ссылку, если автор уже загрузил full-файл."
+                : "После создания заказа исполнитель сможет взять работу в процесс и передать результат через deliverables."}
+            </p>
             <p className="text-sm text-slate-600">
-              Стоимость заказа: <span className="font-semibold text-slate-950">{formatPrice(card.price)}</span>
+              Стоимость: <span className="font-semibold text-slate-950">{formatPrice(card.price)}</span>
             </p>
 
             {canCreateOrderFromOffer ? (
-              <CreateOrderFromOfferButton cardId={card.id} />
+              <CreateOrderFromOfferButton
+                cardId={card.id}
+                label={isReadyProduct ? "Купить бит" : "Создать заказ"}
+                pendingLabel={isReadyProduct ? "Создаем покупку..." : "Создаем заказ..."}
+              />
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
                 {isOwner
                   ? "Это ваша карточка. Заказы по offer создают заказчики."
                   : user
-                    ? "Заказ по offer может создать только заказчик."
-                    : "Войдите как заказчик, чтобы создать заказ по этому offer."}
+                    ? "Заказ по offer может создать только пользователь с ролью заказчика."
+                    : "Войдите как заказчик, чтобы купить этот продукт или заказать услугу."}
               </div>
             )}
           </CardContent>

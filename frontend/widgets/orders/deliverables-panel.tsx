@@ -3,13 +3,14 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Download, FileAudio, History } from "lucide-react";
 
+import { cardsApi } from "@/entities/card/api/cards";
 import { deliverablesApi } from "@/entities/deliverable/api/deliverables";
 import { UploadDeliverableForm } from "@/features/deliverable/upload-deliverable-form";
 import { getErrorMessage } from "@/lib/api/errors";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { Deliverable, Order, User } from "@/shared/types/api";
+import { Card as MarketplaceCard, Deliverable, Order, User } from "@/shared/types/api";
 
 function formatBytes(size: number) {
   if (!size) return "0 Б";
@@ -32,7 +33,7 @@ function canUploadDeliverable(order: Order, user?: User | null) {
   return order.status === "in_progress" || order.status === "review" || order.status === "dispute";
 }
 
-export function DeliverablesPanel({ order, user }: { order: Order; user?: User | null }) {
+export function DeliverablesPanel({ order, user, sourceCard }: { order: Order; user?: User | null; sourceCard?: MarketplaceCard }) {
   const deliverablesQuery = useQuery({
     queryKey: ["deliverables", order.id],
     queryFn: () => deliverablesApi.list(order.id),
@@ -46,7 +47,16 @@ export function DeliverablesPanel({ order, user }: { order: Order; user?: User |
     }
   });
 
-  const canUpload = canUploadDeliverable(order, user);
+  const readyProduct = sourceCard?.card_type === "offer" && sourceCard.kind === "product";
+  const canAccessReadyProduct = Boolean(readyProduct && ["in_progress", "review", "completed"].includes(order.status));
+  const cardFullDownloadMutation = useMutation({
+    mutationFn: async () => {
+      const { url } = await cardsApi.getFullDownloadUrl(sourceCard!.id);
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  });
+
+  const canUpload = canUploadDeliverable(order, user) && !readyProduct;
   const deliverables = deliverablesQuery.data ?? [];
 
   return (
@@ -55,9 +65,13 @@ export function DeliverablesPanel({ order, user }: { order: Order; user?: User |
         <div className="flex items-center justify-between gap-3">
           <div>
             <CardTitle>Результаты по заказу</CardTitle>
-            <CardDescription>Здесь хранятся все версии deliverables, которые привязаны к этой сделке.</CardDescription>
+            <CardDescription>
+              {readyProduct
+                ? "Для готового продукта здесь доступен full-файл, который инженер заранее приложил к карточке."
+                : "Здесь хранятся версии результата, которые исполнитель загружает по этой сделке."}
+            </CardDescription>
           </div>
-          <Badge variant="outline">{deliverables.length} версий</Badge>
+          <Badge variant="outline">{readyProduct ? "Готовый файл" : `${deliverables.length} версий`}</Badge>
         </div>
       </CardHeader>
 
@@ -72,6 +86,30 @@ export function DeliverablesPanel({ order, user }: { order: Order; user?: User |
           </div>
         ) : null}
 
+        {readyProduct ? (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0 space-y-1">
+                <p className="font-medium text-slate-950">Полный файл готового продукта</p>
+                <p className="text-sm leading-6 text-slate-600">
+                  Это приватный full-файл из карточки. Он открывается участникам после того, как заказ взят в работу.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100"
+                disabled={!canAccessReadyProduct || cardFullDownloadMutation.isPending}
+                onClick={() => cardFullDownloadMutation.mutate()}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {cardFullDownloadMutation.isPending ? "Готовим ссылку..." : canAccessReadyProduct ? "Открыть full-файл" : "Доступ после старта"}
+              </Button>
+            </div>
+            {cardFullDownloadMutation.isError ? <p className="mt-3 text-sm text-red-600">{getErrorMessage(cardFullDownloadMutation.error)}</p> : null}
+          </div>
+        ) : null}
+
         {deliverablesQuery.isLoading ? (
           <div className="space-y-3">
             {Array.from({ length: 2 }).map((_, index) => (
@@ -82,7 +120,9 @@ export function DeliverablesPanel({ order, user }: { order: Order; user?: User |
           <p className="text-sm text-red-600">{getErrorMessage(deliverablesQuery.error)}</p>
         ) : deliverables.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
-            Пока deliverables не загружены. Как только исполнитель добавит файл, он появится здесь со своей версией и статусом.
+            {readyProduct
+              ? "Для готового продукта отдельные deliverables обычно не нужны: итоговый файл уже приложен к карточке."
+              : "Пока результаты не загружены. Как только исполнитель добавит файл, он появится здесь со своей версией и статусом."}
           </div>
         ) : (
           <div className="space-y-3">

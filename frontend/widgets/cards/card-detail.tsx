@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { Music2 } from "lucide-react";
 
 import { cardsApi } from "@/entities/card/api/cards";
 import { profilesApi } from "@/entities/profile/api/profiles";
@@ -48,13 +49,37 @@ export function CardDetail({ id }: { id: string }) {
 
   const card = cardQuery.data;
   if (!card) return null;
+  const preview = card.preview_urls?.[0];
+  const showAudioPreview = card.card_type === "offer" && card.kind === "product" && Boolean(preview);
 
   return (
     <div className="space-y-8">
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1.35fr)_380px]">
         <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.32)]">
           <div className="p-4 pb-0">
-            <AudioCoverPreview coverUrl={card.cover_url} audioUrl={card.preview_urls?.[0]} title={card.title} className="aspect-[16/9]" />
+            {showAudioPreview ? (
+              <AudioCoverPreview coverUrl={card.cover_url} audioUrl={preview} title={card.title} className="aspect-[16/9]" />
+            ) : (
+              <div
+                className="relative flex aspect-[16/9] items-end overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(145deg,rgba(15,23,42,0.92),rgba(51,65,85,0.9))] p-6 text-white"
+                style={
+                  card.cover_url
+                    ? {
+                        backgroundImage: `linear-gradient(180deg, rgba(15,23,42,0.12), rgba(15,23,42,0.78)), url(${card.cover_url})`,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center"
+                      }
+                    : undefined
+                }
+              >
+                <div className="relative space-y-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/14 backdrop-blur">
+                    <Music2 className="h-5 w-5" />
+                  </div>
+                  <p className="max-w-2xl text-2xl font-semibold leading-tight">{card.title}</p>
+                </div>
+              </div>
+            )}
           </div>
           <CardHeader className="space-y-4">
             <div className="flex flex-wrap gap-2">

@@ -22,7 +22,7 @@ export function MarkNotificationsReadButton({ ids }: { ids?: string[] }) {
       onClick={() => mutation.mutate()}
       disabled={mutation.isPending}
     >
-      {mutation.isPending ? "Обновляем..." : ids?.length ? "Пометить как прочитанное" : "Прочитать все"}
+      {mutation.isPending ? "Обновляем..." : ids?.length ? "Пометить прочитанным" : "Прочитать все"}
     </Button>
   );
 }

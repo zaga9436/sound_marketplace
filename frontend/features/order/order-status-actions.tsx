@@ -13,34 +13,47 @@ type ActionItem = {
   label: string;
 };
 
-function getAvailableActions(order: Order, role?: string | null): ActionItem[] {
+function getAvailableActions(order: Order, role?: string | null, readyProduct = false): ActionItem[] {
   if (role === "engineer") {
-    if (order.status === "on_hold") return [{ status: "in_progress", label: "Взять в работу" }];
-    if (order.status === "in_progress") return [{ status: "review", label: "Отправить на проверку" }];
+    if (order.status === "on_hold") {
+      return [{ status: "in_progress", label: readyProduct ? "Подготовить выдачу" : "Взять в работу" }];
+    }
+    if (order.status === "in_progress") {
+      return [{ status: "review", label: readyProduct ? "Открыть проверку покупки" : "Отправить на проверку" }];
+    }
   }
 
   if (role === "customer") {
-    if (order.status === "review") return [{ status: "completed", label: "Подтвердить выполнение" }];
+    if (order.status === "review") {
+      return [{ status: "completed", label: readyProduct ? "Завершить покупку" : "Подтвердить выполнение" }];
+    }
   }
 
   return [];
 }
 
-export function OrderStatusActions({ order }: { order: Order }) {
+export function OrderStatusActions({ order, readyProduct = false }: { order: Order; readyProduct?: boolean }) {
   const queryClient = useQueryClient();
   const role = useAuthStore((state) => state.user?.role);
-  const actions = getAvailableActions(order, role);
+  const actions = getAvailableActions(order, role, readyProduct);
 
   const mutation = useMutation({
     mutationFn: (status: OrderStatus) => ordersApi.updateStatus(order.id, status),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["orders"] });
       await queryClient.invalidateQueries({ queryKey: ["order", order.id] });
+      await queryClient.invalidateQueries({ queryKey: ["balance"] });
     }
   });
 
   if (actions.length === 0) {
-    return <p className="text-sm text-slate-500">Сейчас для вашей роли нет доступных действий по этому заказу.</p>;
+    return (
+      <p className="text-sm leading-6 text-slate-500">
+        {readyProduct
+          ? "Сейчас для вашей роли нет доступных действий по покупке. Доступ к полному файлу появится после завершения сделки."
+          : "Сейчас для вашей роли нет доступных действий по этому заказу."}
+      </p>
+    );
   }
 
   return (

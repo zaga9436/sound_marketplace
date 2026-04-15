@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Download } from "lucide-react";
 
 import { cardsApi } from "@/entities/card/api/cards";
 import { disputesApi } from "@/entities/dispute/api/disputes";
@@ -16,7 +17,7 @@ import { useAuthStore } from "@/lib/auth/session-store";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card";
-import { User } from "@/shared/types/api";
+import { MediaFile, User } from "@/shared/types/api";
 import { OrderChatPanel } from "@/widgets/chat/order-chat-panel";
 import { DeliverablesPanel } from "@/widgets/orders/deliverables-panel";
 import { OrderStatusBadge } from "@/widgets/orders/order-status-badge";
@@ -29,21 +30,36 @@ function formatPrice(value: number) {
   }).format(value);
 }
 
-function getNextStep(orderStatus: string, user?: User | null) {
+function getNextStep(orderStatus: string, user?: User | null, readyProduct = false) {
   if (orderStatus === "on_hold") {
+    if (readyProduct) {
+      return user?.role === "engineer"
+        ? "Покупка готового продукта создана. Подготовьте выдачу, чтобы заказчик мог завершить сделку и получить доступ к full-файлу."
+        : "Покупка создана. Это готовый продукт, поэтому здесь не нужен долгий производственный процесс: после завершения сделки full-файл откроется по защищенной ссылке.";
+    }
     return user?.role === "engineer" ? "Возьмите заказ в работу и начните производство результата." : "Ожидайте, пока исполнитель возьмет заказ в работу.";
   }
   if (orderStatus === "in_progress") {
+    if (readyProduct) {
+      return user?.role === "engineer"
+        ? "Откройте проверку покупки, когда full-файл готов к выдаче."
+        : "Покупка готовится к выдаче. Следите за статусом: после проверки можно будет завершить сделку и скачать full-файл.";
+    }
     return user?.role === "engineer" ? "Загрузите промежуточный или финальный deliverable и отправьте заказ на проверку." : "Следите за чатом и ожидайте новую версию результата.";
   }
   if (orderStatus === "review") {
+    if (readyProduct) {
+      return user?.role === "customer"
+        ? "Проверьте покупку и завершите сделку. После завершения full-файл будет доступен по приватной ссылке."
+        : "Ожидайте подтверждения покупки заказчиком.";
+    }
     return user?.role === "customer" ? "Проверьте deliverables, обсудите детали в чате и подтвердите завершение, если все готово." : "Ожидайте проверки заказчиком и будьте готовы ответить в чате.";
   }
   if (orderStatus === "dispute") {
     return "Спор открыт. Все действия по заказу сейчас проходят через dispute flow и историю сообщений.";
   }
   if (orderStatus === "completed") {
-    return "Сделка завершена. Можно скачать актуальный результат и, если доступно, оставить отзыв.";
+    return readyProduct ? "Покупка завершена. Полный файл доступен через приватную ссылку в блоке связанной карточки." : "Сделка завершена. Можно скачать актуальный результат и, если доступно, оставить отзыв.";
   }
   if (orderStatus === "cancelled") {
     return "Заказ отменен. Средства возвращены или спор закрыт соответствующим решением.";
@@ -64,7 +80,10 @@ export function OrderDetailPage({ id }: { id: string }) {
     queryKey: ["balance"],
     queryFn: () => paymentsApi.getBalance(),
     enabled: Boolean(user),
-    refetchInterval: 5000
+    refetchInterval: 5000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true
   });
 
   const order = orderQuery.data;
@@ -95,6 +114,30 @@ export function OrderDetailPage({ id }: { id: string }) {
     enabled: Boolean(order)
   });
 
+  const sourceCard = sourceCardQuery.data;
+  const readyProduct = sourceCard?.card_type === "offer" && sourceCard.kind === "product";
+  const fullDownloadQuery = useQuery({
+    queryKey: ["card", sourceCard?.id, "full-download", "order-detail"],
+    queryFn: () => cardsApi.getFullDownloadUrl(sourceCard!.id),
+    retry: false,
+    enabled: Boolean(readyProduct && sourceCard?.id && order && ["in_progress", "review", "completed"].includes(order.status))
+  });
+
+  const canAccessPrivateCardMedia = Boolean(order && ["in_progress", "review", "completed", "dispute"].includes(order.status));
+  const materialsQuery = useQuery({
+    queryKey: ["card", sourceCard?.id, "materials", "order-detail"],
+    queryFn: () => cardsApi.listMaterials(sourceCard!.id),
+    retry: false,
+    enabled: Boolean(sourceCard?.card_type === "request" && sourceCard.id && canAccessPrivateCardMedia)
+  });
+
+  const materialDownloadMutation = useMutation({
+    mutationFn: async (material: MediaFile) => {
+      const { url } = await cardsApi.getMaterialDownloadUrl(sourceCard!.id, material.id);
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  });
+
   if (orderQuery.isLoading) {
     return <div className="surface h-[420px] animate-pulse bg-white/70" />;
   }
@@ -112,7 +155,7 @@ export function OrderDetailPage({ id }: { id: string }) {
   if (!order) return null;
 
   const canReview = user?.role === "customer" && user.id === order.customer_id && order.status === "completed";
-  const nextStep = getNextStep(order.status, user);
+  const nextStep = getNextStep(order.status, user, readyProduct);
 
   return (
     <div className="space-y-8">
@@ -120,6 +163,7 @@ export function OrderDetailPage({ id }: { id: string }) {
         <div className="flex flex-wrap items-center gap-3">
           <OrderStatusBadge status={order.status} />
           <Badge variant="outline">ID: {order.id}</Badge>
+          {readyProduct ? <Badge className="bg-slate-900 text-white hover:bg-slate-900">Готовый продукт</Badge> : null}
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_360px]">
@@ -127,7 +171,7 @@ export function OrderDetailPage({ id }: { id: string }) {
             <CardHeader className="space-y-3">
               <CardTitle className="text-3xl text-slate-950">Заказ на {formatPrice(order.amount)}</CardTitle>
               <CardDescription className="max-w-3xl text-base leading-7 text-slate-600">
-                Главный экран сделки: здесь видно текущий этап, участников, чат, deliverables, спор, отзыв и следующие действия.
+                Главный экран сделки: статус, участники, чат, файлы, спор, отзыв и следующие действия собраны в одном месте.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -150,7 +194,7 @@ export function OrderDetailPage({ id }: { id: string }) {
           <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
             <CardHeader>
               <CardTitle>Деньги по сделке</CardTitle>
-              <CardDescription>Баланс помогает быстро понять, хватает ли средств на новые действия и пополнения.</CardDescription>
+              <CardDescription>Баланс обновляется при открытии экрана и после финансовых действий.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {balanceQuery.isLoading ? (
@@ -160,7 +204,7 @@ export function OrderDetailPage({ id }: { id: string }) {
               ) : (
                 <div className="rounded-2xl border border-slate-200 bg-[linear-gradient(145deg,rgba(15,23,42,0.96),rgba(51,65,85,0.92))] p-5 text-white">
                   <p className="text-sm text-white/70">Текущий баланс</p>
-                  <p className="mt-2 text-3xl font-semibold">{formatPrice(balanceQuery.data?.balance ?? 0)}</p>
+                  <p className="mt-2 text-3xl font-semibold text-white">{formatPrice(balanceQuery.data?.balance ?? 0)}</p>
                 </div>
               )}
 
@@ -201,7 +245,50 @@ export function OrderDetailPage({ id }: { id: string }) {
             </CardContent>
           </Card>
 
-          <DeliverablesPanel order={order} user={user} />
+          <DeliverablesPanel order={order} user={user} sourceCard={sourceCard} />
+
+          {sourceCard?.card_type === "request" ? (
+            <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
+              <CardHeader>
+                <CardTitle>Материалы заказчика</CardTitle>
+                <CardDescription>
+                  Приватные файлы задачи: дорожки, вокал, бит или ZIP-архив. Исполнитель получает доступ после старта заказа.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {!canAccessPrivateCardMedia ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+                    Материалы откроются исполнителю, когда заказ будет взят в работу.
+                  </div>
+                ) : materialsQuery.isLoading ? (
+                  <div className="surface h-20 animate-pulse bg-slate-100/80" />
+                ) : materialsQuery.isError ? (
+                  <p className="text-sm text-slate-500">Материалы не найдены или пока недоступны.</p>
+                ) : (materialsQuery.data ?? []).length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500">Заказчик не приложил дополнительные материалы.</p>
+                ) : (
+                  materialsQuery.data?.map((material) => (
+                    <div key={material.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-950">{material.original_filename}</p>
+                        <p className="text-sm text-slate-500">{material.content_type}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100"
+                        disabled={materialDownloadMutation.isPending}
+                        onClick={() => materialDownloadMutation.mutate(material)}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Скачать
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
 
           <OrderChatPanel orderId={order.id} />
 
@@ -238,10 +325,10 @@ export function OrderDetailPage({ id }: { id: string }) {
           <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
             <CardHeader>
               <CardTitle>Действия по статусу</CardTitle>
-              <CardDescription>Кнопки появляются только тогда, когда backend разрешает этот переход для вашей роли.</CardDescription>
+              <CardDescription>Кнопки появляются только тогда, когда backend разрешает переход для вашей роли.</CardDescription>
             </CardHeader>
             <CardContent>
-              <OrderStatusActions order={order} />
+              <OrderStatusActions order={order} readyProduct={readyProduct} />
             </CardContent>
           </Card>
 
@@ -252,15 +339,29 @@ export function OrderDetailPage({ id }: { id: string }) {
             <CardContent className="space-y-4">
               {sourceCardQuery.isLoading ? (
                 <p className="text-sm text-slate-500">Загружаем карточку...</p>
-              ) : sourceCardQuery.data ? (
+              ) : sourceCard ? (
                 <>
                   <div className="space-y-2">
-                    <p className="font-medium text-slate-950">{sourceCardQuery.data.title}</p>
-                    <p className="text-sm text-slate-600">{sourceCardQuery.data.description}</p>
+                    <p className="font-medium text-slate-950">{sourceCard.title}</p>
+                    <p className="text-sm text-slate-600">{sourceCard.description}</p>
+                    {readyProduct ? (
+                      <p className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+                        Это готовый продукт. После старта сделки полный файл доступен участникам через приватную ссылку.
+                      </p>
+                    ) : null}
                   </div>
-                  <Button asChild variant="outline" className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100">
-                    <Link href={`/cards/${sourceCardQuery.data.id}`}>Открыть карточку</Link>
-                  </Button>
+                  <div className="flex flex-wrap gap-3">
+                    <Button asChild variant="outline" className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100">
+                      <Link href={`/cards/${sourceCard.id}`}>Открыть карточку</Link>
+                    </Button>
+                    {fullDownloadQuery.data?.url ? (
+                      <Button asChild className="rounded-2xl bg-slate-900 text-white hover:bg-slate-800">
+                        <a href={fullDownloadQuery.data.url} target="_blank" rel="noreferrer">
+                          Скачать полный файл
+                        </a>
+                      </Button>
+                    ) : null}
+                  </div>
                 </>
               ) : (
                 <p className="text-sm text-slate-500">Связанная карточка недоступна.</p>
@@ -273,7 +374,7 @@ export function OrderDetailPage({ id }: { id: string }) {
               <CardTitle>Быстрые переходы</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-sm leading-6 text-slate-600">Отсюда удобно перейти к остальным заказам, чатам, уведомлениям и балансу, не теряя контекст сделки.</p>
+              <p className="text-sm leading-6 text-slate-600">Отсюда удобно перейти к заказам, чатам, уведомлениям и балансу, не теряя контекст сделки.</p>
               <div className="flex flex-wrap gap-3">
                 <Button asChild className="rounded-2xl bg-slate-900 text-white hover:bg-slate-800">
                   <Link href="/orders">Все заказы</Link>

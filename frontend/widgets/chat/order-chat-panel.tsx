@@ -22,17 +22,16 @@ export function OrderChatPanel({ orderId }: { orderId: string }) {
   const markReadMutation = useMutation({
     mutationFn: () => chatApi.markRead(orderId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["chat", orderId, "messages"] });
       await queryClient.invalidateQueries({ queryKey: ["chats"] });
       await queryClient.invalidateQueries({ queryKey: ["notifications"] });
     }
   });
 
   useEffect(() => {
-    if (messagesQuery.data && messagesQuery.data.length > 0) {
+    if ((messagesQuery.data?.length ?? 0) > 0 && !markReadMutation.isPending) {
       markReadMutation.mutate();
     }
-  }, [messagesQuery.data]);
+  }, [messagesQuery.data?.length]);
 
   return (
     <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
@@ -49,25 +48,29 @@ export function OrderChatPanel({ orderId }: { orderId: string }) {
         ) : messagesQuery.isError ? (
           <p className="text-sm text-red-600">{getErrorMessage(messagesQuery.error)}</p>
         ) : messagesQuery.data && messagesQuery.data.length > 0 ? (
-          <div className="space-y-3">
+          <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
             {messagesQuery.data.map((message) => {
               const isOwn = message.sender_id === user?.id;
               return (
-                <div
-                  key={message.id}
-                  className={`rounded-2xl border px-4 py-3 ${isOwn ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-slate-50 text-slate-900"}`}
-                >
-                  <p className="text-sm leading-6">{message.body}</p>
-                  <p className={`mt-2 text-xs ${isOwn ? "text-slate-300" : "text-slate-500"}`}>
-                    {new Date(message.created_at).toLocaleString("ru-RU")}
-                  </p>
+                <div key={message.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[82%] rounded-[1.25rem] border px-4 py-3 shadow-sm ${
+                      isOwn ? "border-slate-300 bg-slate-100 text-slate-950" : "border-slate-200 bg-white text-slate-900"
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap break-words text-sm leading-6">{message.body}</p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {isOwn ? "Вы • " : ""}
+                      {new Date(message.created_at).toLocaleString("ru-RU")}
+                    </p>
+                  </div>
                 </div>
               );
             })}
           </div>
         ) : (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-            Пока сообщений нет. Здесь можно обсуждать детали работы, правки и ход выполнения заказа.
+            Пока сообщений нет. Здесь можно обсуждать детали работы, правки, сроки и ход выполнения заказа.
           </div>
         )}
 

@@ -36,5 +36,8 @@ export const cardsApi = {
   uploadCover: (id: string, formData: FormData) => apiClient.upload<MediaFile>(`/cards/${id}/media/cover`, formData),
   uploadPreview: (id: string, formData: FormData) => apiClient.upload<MediaFile>(`/cards/${id}/media/preview`, formData),
   uploadFull: (id: string, formData: FormData) => apiClient.upload<MediaFile>(`/cards/${id}/media/full`, formData),
-  getFullDownloadUrl: (id: string) => apiClient.get<DownloadResponse>(`/cards/${id}/download`)
+  uploadMaterials: (id: string, formData: FormData) => apiClient.upload<MediaFile>(`/cards/${id}/media/materials`, formData),
+  getFullDownloadUrl: (id: string) => apiClient.get<DownloadResponse>(`/cards/${id}/download`),
+  listMaterials: (id: string) => apiClient.get<MediaFile[]>(`/cards/${id}/materials`),
+  getMaterialDownloadUrl: (cardId: string, mediaId: string) => apiClient.get<DownloadResponse>(`/cards/${cardId}/materials/${mediaId}/download`)
 };

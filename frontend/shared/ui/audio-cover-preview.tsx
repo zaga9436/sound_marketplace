@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { MouseEvent, useEffect, useRef, useState } from "react";
 import { Pause, Play, Waves } from "lucide-react";
 
 import { cn } from "@/shared/utils/cn";
@@ -33,7 +33,10 @@ export function AudioCoverPreview({ coverUrl, audioUrl, title, compact = false, 
     };
   }, []);
 
-  const togglePlayback = async () => {
+  const togglePlayback = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
     const audio = audioRef.current;
     if (!audio || !audioUrl) return;
 
@@ -65,7 +68,7 @@ export function AudioCoverPreview({ coverUrl, audioUrl, title, compact = false, 
       }
     >
       {!coverUrl ? (
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(148,163,184,0.24),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.18),transparent_22%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(148,163,184,0.24),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(71,85,105,0.22),transparent_22%)]" />
       ) : null}
 
       <div className="relative flex h-full flex-col justify-between p-5">
@@ -81,7 +84,9 @@ export function AudioCoverPreview({ coverUrl, audioUrl, title, compact = false, 
           <button
             type="button"
             onClick={togglePlayback}
+            onMouseDown={(event) => event.stopPropagation()}
             disabled={!audioUrl}
+            aria-label={isPlaying ? "Поставить preview на паузу" : "Прослушать preview"}
             className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-slate-950 shadow-lg transition hover:scale-[1.02] disabled:cursor-not-allowed disabled:bg-white/70"
           >
             {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
@@ -95,7 +100,7 @@ export function AudioCoverPreview({ coverUrl, audioUrl, title, compact = false, 
         </div>
       </div>
 
-      {audioUrl ? <audio ref={audioRef} preload="none" src={audioUrl} /> : null}
+      {audioUrl ? <audio ref={audioRef} preload="none" src={audioUrl} onClick={(event) => event.stopPropagation()} /> : null}
     </div>
   );
 }

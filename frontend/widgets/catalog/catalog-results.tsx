@@ -83,7 +83,7 @@ export function CatalogResults() {
       {items.length === 0 ? (
         <Card className="border-slate-200/80 bg-white/95">
           <CardContent className="pt-6">
-            <p>По текущим фильтрам карточек не найдено.</p>
+            <p>По текущим фильтрам карточек не найдено. Попробуйте изменить запрос или диапазон цены.</p>
           </CardContent>
         </Card>
       ) : (

@@ -144,7 +144,7 @@ export interface MediaFile {
   original_filename: string;
   content_type: string;
   size_bytes: number;
-  media_role: "avatar" | "cover" | "preview" | "full";
+  media_role: "avatar" | "cover" | "preview" | "full" | "material";
   url?: string;
   created_at?: string;
 }

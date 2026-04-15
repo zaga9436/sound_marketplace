@@ -30,7 +30,10 @@ export function BalancePage() {
   const balanceQuery = useQuery({
     queryKey: ["balance"],
     queryFn: () => paymentsApi.getBalance(),
-    refetchInterval: 5000
+    refetchInterval: 5000,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true
   });
 
   const createPaymentMutation = useMutation({
@@ -49,8 +52,8 @@ export function BalancePage() {
   const syncHint = useMemo(() => {
     if (!syncMutation.data) return null;
     return syncMutation.data.deposit_created
-      ? "Платеж подтвержден, депозит зачислен на баланс."
-      : "Статус платежа обновлен. Повторного зачисления не произошло.";
+      ? "Платеж подтвержден, сумма зачислена на баланс."
+      : "Статус платежа обновлен. Повторного зачисления не было.";
   }, [syncMutation.data]);
 
   const handleCreatePayment = () => {
@@ -71,9 +74,9 @@ export function BalancePage() {
           Баланс и платежи
         </Badge>
         <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Деньги внутри SoundMarket</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Средства внутри SoundMarket</h1>
           <p className="max-w-3xl text-base leading-7 text-slate-600">
-            Здесь удобно пополнять баланс, переходить к оплате и вручную синхронизировать тестовый платеж в dev-режиме.
+            Пополняйте баланс, оплачивайте заказы и проверяйте поступление платежа после возврата со страницы оплаты.
           </p>
         </div>
       </section>
@@ -87,7 +90,7 @@ export function BalancePage() {
               </div>
               <div>
                 <CardTitle>Текущий баланс</CardTitle>
-                <CardDescription>Доступные внутренние средства для создания заказов.</CardDescription>
+                <CardDescription>Доступные средства для покупки готовых продуктов и создания заказов.</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -99,8 +102,8 @@ export function BalancePage() {
             ) : (
               <div className="rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(145deg,rgba(15,23,42,0.96),rgba(51,65,85,0.92))] p-6 text-white">
                 <p className="text-sm text-white/70">Доступно сейчас</p>
-                <p className="mt-3 text-4xl font-semibold tracking-tight">{formatPrice(balanceQuery.data?.balance ?? 0)}</p>
-                <p className="mt-4 text-sm text-white/75">Баланс используется для резерва средств при создании заказов и для возвратов по спорным сценариям.</p>
+                <p className="mt-3 text-4xl font-semibold tracking-tight text-white">{formatPrice(balanceQuery.data?.balance ?? 0)}</p>
+                <p className="mt-4 text-sm text-white/75">Баланс используется для резервирования средств по заказам и возвратов при отмене сделки.</p>
               </div>
             )}
 
@@ -123,7 +126,7 @@ export function BalancePage() {
           <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
             <CardHeader>
               <CardTitle>Пополнение баланса</CardTitle>
-              <CardDescription>Создайте платеж и перейдите в YooKassa для оплаты.</CardDescription>
+              <CardDescription>Создайте платеж и перейдите на страницу оплаты.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -134,7 +137,7 @@ export function BalancePage() {
               {createPaymentMutation.isError ? <p className="text-sm text-red-600">{getErrorMessage(createPaymentMutation.error)}</p> : null}
               {createPaymentMutation.isSuccess ? (
                 <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-800">
-                  Платеж создан. После оплаты можно вернуться сюда и синхронизировать его, если webhook недоступен в локальной среде.
+                  Платеж создан. После оплаты вернитесь на эту страницу и нажмите “Проверить платеж”, если баланс не обновился автоматически.
                 </div>
               ) : null}
 
@@ -155,7 +158,7 @@ export function BalancePage() {
 
               {createPaymentMutation.data?.external_id ? (
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  Внешний ID платежа: <span className="font-mono text-slate-900">{createPaymentMutation.data.external_id}</span>
+                  Номер платежа: <span className="font-mono text-slate-900">{createPaymentMutation.data.external_id}</span>
                 </div>
               ) : null}
             </CardContent>
@@ -163,12 +166,12 @@ export function BalancePage() {
 
           <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
             <CardHeader>
-              <CardTitle>Dev sync платежа</CardTitle>
-              <CardDescription>Удобный fallback для локальной разработки без публичного webhook URL.</CardDescription>
+              <CardTitle>Проверка платежа</CardTitle>
+              <CardDescription>Если после оплаты баланс еще не обновился, введите номер платежа и проверьте его статус.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="external-id">External ID платежа</Label>
+                <Label htmlFor="external-id">Номер платежа</Label>
                 <Input
                   id="external-id"
                   value={externalId}
@@ -183,7 +186,7 @@ export function BalancePage() {
 
               <Button type="button" variant="outline" className="rounded-2xl border-slate-300 bg-white text-slate-900 hover:bg-slate-100" disabled={syncMutation.isPending} onClick={handleSync}>
                 <RefreshCcw className="mr-2 h-4 w-4" />
-                {syncMutation.isPending ? "Синхронизируем..." : "Синхронизировать платеж"}
+                {syncMutation.isPending ? "Проверяем..." : "Проверить платеж"}
               </Button>
             </CardContent>
           </Card>
