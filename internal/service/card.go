@@ -54,6 +54,7 @@ func (s *CardService) Create(actor domain.User, payload domain.Card) (domain.Car
 		return domain.Card{}, err
 	}
 	card.PreviewURLs = []string{}
+	card.CoverURL = ""
 	s.notifier.Publish(actor.ID, "card_published", "Card published")
 	return card, nil
 }
@@ -73,7 +74,7 @@ func (s *CardService) Update(actor domain.User, cardID string, payload domain.Ca
 		return domain.Card{}, err
 	}
 	updatedCards := []domain.Card{updated}
-	if err := s.attachPreviewURLs(context.Background(), updatedCards); err == nil {
+	if err := s.attachCardMedia(context.Background(), updatedCards); err == nil {
 		updated = updatedCards[0]
 	}
 	if updated.PreviewURLs == nil {
@@ -87,7 +88,7 @@ func (s *CardService) List(query domain.CardQuery) (domain.CardList, error) {
 	if err != nil {
 		return domain.CardList{}, err
 	}
-	if err := s.attachPreviewURLs(context.Background(), cards.Items); err != nil {
+	if err := s.attachCardMedia(context.Background(), cards.Items); err != nil {
 		return domain.CardList{}, err
 	}
 	if cards.Items == nil {
@@ -105,14 +106,20 @@ func (s *CardService) Get(cardID string) (domain.Card, error) {
 		return domain.Card{}, apierr.NotFound("card not found")
 	}
 	cards := []domain.Card{card}
-	if err := s.attachPreviewURLs(context.Background(), cards); err != nil {
+	if err := s.attachCardMedia(context.Background(), cards); err != nil {
 		return domain.Card{}, err
 	}
 	return cards[0], nil
 }
 
-func (s *CardService) attachPreviewURLs(_ context.Context, cards []domain.Card) error {
+func (s *CardService) attachCardMedia(_ context.Context, cards []domain.Card) error {
 	for i := range cards {
+		cover, err := s.store.GetLatestMediaByCardAndRole(cards[i].ID, domain.MediaRoleCover)
+		if err == nil {
+			cards[i].CoverURL = s.storage.PublicURL(cover.FileKey)
+		} else if err != repository.ErrNotFound {
+			return err
+		}
 		mediaFiles, err := s.store.ListMediaByCardAndRole(cards[i].ID, domain.MediaRolePreview)
 		if err != nil {
 			return err

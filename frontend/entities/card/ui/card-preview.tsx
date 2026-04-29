@@ -16,7 +16,7 @@ function formatPrice(value: number) {
   }).format(value);
 }
 
-function StaticCover({ coverUrl, title }: { coverUrl?: string; title: string }) {
+function StaticCover({ coverUrl }: { coverUrl?: string }) {
   return (
     <div
       className="relative flex aspect-[16/11] items-end overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(145deg,rgba(15,23,42,0.92),rgba(51,65,85,0.9))] p-5 text-white shadow-[0_20px_60px_-30px_rgba(15,23,42,0.42)]"
@@ -37,7 +37,6 @@ function StaticCover({ coverUrl, title }: { coverUrl?: string; title: string }) 
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/14 backdrop-blur">
           <Music2 className="h-5 w-5" />
         </div>
-        <p className="line-clamp-2 max-w-[85%] text-base font-semibold leading-tight">{title}</p>
       </div>
     </div>
   );
@@ -51,7 +50,7 @@ export function CardPreview({ card }: { card: Card }) {
     <Link href={`/cards/${card.id}`} className="block">
       <UICard className="h-full overflow-hidden border-slate-200/80 bg-white/95 shadow-[0_18px_50px_-28px_rgba(15,23,42,0.28)] transition-transform hover:-translate-y-1">
         <div className="p-3 pb-0">
-          {showAudioPreview ? <AudioCoverPreview coverUrl={card.cover_url} audioUrl={preview} title={card.title} compact /> : <StaticCover coverUrl={card.cover_url} title={card.title} />}
+          {showAudioPreview ? <AudioCoverPreview coverUrl={card.cover_url} audioUrl={preview} title={card.title} compact /> : <StaticCover coverUrl={card.cover_url} />}
         </div>
 
         <CardHeader className="space-y-3">

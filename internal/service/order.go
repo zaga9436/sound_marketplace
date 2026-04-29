@@ -208,7 +208,7 @@ func (s *OrderService) UpdateStatus(actor domain.User, orderID string, next doma
 				UserID:  order.EngineerID,
 				OrderID: order.ID,
 				Type:    domain.TransactionTypeRelease,
-				Amount:  order.Amount,
+				Amount:  engineerPayoutAmount(order.Amount),
 			}); err != nil {
 				return err
 			}

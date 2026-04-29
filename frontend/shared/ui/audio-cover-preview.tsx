@@ -10,10 +10,11 @@ type AudioCoverPreviewProps = {
   audioUrl?: string;
   title: string;
   compact?: boolean;
+  showTitle?: boolean;
   className?: string;
 };
 
-export function AudioCoverPreview({ coverUrl, audioUrl, title, compact = false, className }: AudioCoverPreviewProps) {
+export function AudioCoverPreview({ coverUrl, audioUrl, title, compact = false, showTitle = true, className }: AudioCoverPreviewProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -92,7 +93,7 @@ export function AudioCoverPreview({ coverUrl, audioUrl, title, compact = false, 
             {isPlaying ? <Pause className="h-5 w-5" /> : <Play className="ml-0.5 h-5 w-5" />}
           </button>
           <div className={compact ? "space-y-1" : "space-y-2"}>
-            <p className={cn("max-w-[85%] font-semibold leading-tight", compact ? "line-clamp-2 text-base" : "line-clamp-2 text-2xl")}>{title}</p>
+            {!compact && showTitle ? <p className={cn("max-w-[85%] font-semibold leading-tight", "line-clamp-2 text-2xl")}>{title}</p> : null}
             <p className="text-sm text-white/80">
               {audioUrl ? "Нажмите, чтобы прослушать фрагмент." : "Загрузите аудио preview, чтобы оживить карточку."}
             </p>

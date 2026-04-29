@@ -74,6 +74,29 @@ paths:
       responses:
         '200':
           description: Updated profile
+  /profiles/me/avatar:
+    post:
+      summary: Upload public avatar for current profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Avatar uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaFile'
   /profiles/{id}:
     get:
       summary: Get public profile
@@ -228,6 +251,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MediaFile'
+  /cards/{id}/media/cover:
+    post:
+      summary: Upload public cover image for card
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Cover uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaFile'
   /cards/{id}/media/full:
     post:
       summary: Upload private full media for card
@@ -253,6 +301,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MediaFile'
+  /cards/{id}/media/materials:
+    post:
+      summary: Upload private customer materials for request card
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Material uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaFile'
   /cards/{id}/download:
     get:
       summary: Get signed URL for full card media
@@ -260,6 +333,41 @@ paths:
         - bearerAuth: []
       parameters:
         - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Signed URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadResponse'
+  /cards/{id}/materials:
+    get:
+      summary: List private customer materials for request card
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Materials
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MediaFile'
+  /cards/{id}/materials/{media_id}/download:
+    get:
+      summary: Get signed URL for private customer material
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ID'
+        - name: media_id
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Signed URL
@@ -433,6 +541,7 @@ paths:
                   $ref: '#/components/schemas/Deliverable'
     post:
       summary: Upload new private deliverable version for order
+      description: Accepts audio files and ZIP archives with stems, projects, or source materials.
       security:
         - bearerAuth: []
       parameters:
@@ -1010,6 +1119,8 @@ components:
           type: string
         bio:
           type: string
+        avatar_url:
+          type: string
         rating:
           type: number
           format: double
@@ -1039,6 +1150,8 @@ components:
           type: array
           items:
             type: string
+        cover_url:
+          type: string
         preview_urls:
           type: array
           items:
@@ -1086,7 +1199,7 @@ components:
           format: int64
         media_role:
           type: string
-          enum: [preview, full]
+          enum: [avatar, cover, preview, full, material]
         url:
           type: string
         created_at:

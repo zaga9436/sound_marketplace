@@ -309,7 +309,6 @@ func (s *PostgresStore) listCardsWithQuery(query domain.CardQuery, admin bool) (
 	if err := rows.Err(); err != nil {
 		return domain.CardList{}, err
 	}
-
 	return domain.CardList{
 		Items:  items,
 		Total:  total,
@@ -408,7 +407,7 @@ func (s *PostgresStore) CreateMedia(media domain.MediaFile) (domain.MediaFile, e
 	media.ID = uuid.NewString()
 	media.CreatedAt = time.Now().UTC()
 	visibility := "private"
-	if media.MediaRole == domain.MediaRolePreview {
+	if media.MediaRole == domain.MediaRoleAvatar || media.MediaRole == domain.MediaRolePreview || media.MediaRole == domain.MediaRoleCover {
 		visibility = "public"
 	}
 
@@ -457,6 +456,17 @@ func (s *PostgresStore) GetLatestMediaByCardAndRole(cardID string, role domain.M
 		 ORDER BY created_at DESC
 		 LIMIT 1`,
 		cardID, string(role),
+	))
+}
+
+func (s *PostgresStore) GetLatestMediaByOwnerAndRole(ownerUserID string, role domain.MediaRole) (domain.MediaFile, error) {
+	return s.scanMedia(s.runner().QueryRow(
+		`SELECT id, COALESCE(card_id, ''), uploaded_by, storage_key, COALESCE(original_filename, ''), mime_type, COALESCE(size_bytes, 0), purpose, created_at
+		 FROM media_files
+		 WHERE uploaded_by = $1 AND purpose = $2
+		 ORDER BY created_at DESC
+		 LIMIT 1`,
+		ownerUserID, string(role),
 	))
 }
 
@@ -532,6 +542,24 @@ func (s *PostgresStore) UserHasCompletedCardAccess(cardID, userID string) (bool,
 			SELECT 1
 			FROM orders
 			WHERE status = 'completed'
+			  AND (
+			    (card_id = $1 AND (customer_id = $2 OR engineer_id = $2))
+			    OR
+			    (request_id = $1 AND (customer_id = $2 OR engineer_id = $2))
+			  )
+		)`,
+		cardID, userID,
+	).Scan(&exists)
+	return exists, err
+}
+
+func (s *PostgresStore) UserHasStartedCardAccess(cardID, userID string) (bool, error) {
+	var exists bool
+	err := s.runner().QueryRow(
+		`SELECT EXISTS (
+			SELECT 1
+			FROM orders
+			WHERE status IN ('in_progress', 'review', 'completed')
 			  AND (
 			    (card_id = $1 AND (customer_id = $2 OR engineer_id = $2))
 			    OR

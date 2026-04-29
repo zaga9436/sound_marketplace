@@ -9,11 +9,13 @@ import (
 	"github.com/soundmarket/backend/internal/auth"
 	"github.com/soundmarket/backend/internal/domain"
 	"github.com/soundmarket/backend/internal/repository"
+	"github.com/soundmarket/backend/internal/storage"
 )
 
 type AuthService struct {
-	store repository.Store
-	jwt   *auth.JWTManager
+	store   repository.Store
+	jwt     *auth.JWTManager
+	storage storage.Adapter
 }
 
 type AuthResult struct {
@@ -22,8 +24,8 @@ type AuthResult struct {
 	Profile domain.Profile `json:"profile"`
 }
 
-func NewAuthService(store repository.Store, jwt *auth.JWTManager) *AuthService {
-	return &AuthService{store: store, jwt: jwt}
+func NewAuthService(store repository.Store, jwt *auth.JWTManager, storageAdapter storage.Adapter) *AuthService {
+	return &AuthService{store: store, jwt: jwt, storage: storageAdapter}
 }
 
 func (s *AuthService) Register(email, password string, role domain.Role) (*AuthResult, error) {
@@ -46,6 +48,7 @@ func (s *AuthService) Register(email, password string, role domain.Role) (*AuthR
 	if err != nil {
 		return nil, err
 	}
+	s.attachAvatar(&profile)
 	token, err := s.jwt.Generate(user.ID, string(user.Role))
 	if err != nil {
 		return nil, err
@@ -69,6 +72,7 @@ func (s *AuthService) Login(email, password string) (*AuthResult, error) {
 	if err != nil {
 		return nil, err
 	}
+	s.attachAvatar(&profile)
 	token, err := s.jwt.Generate(user.ID, string(user.Role))
 	if err != nil {
 		return nil, err
@@ -85,5 +89,16 @@ func (s *AuthService) Me(userID string) (*AuthResult, error) {
 	if err != nil {
 		return nil, apierr.NotFound("profile not found")
 	}
+	s.attachAvatar(&profile)
 	return &AuthResult{User: user, Profile: profile}, nil
+}
+
+func (s *AuthService) attachAvatar(profile *domain.Profile) {
+	if profile == nil {
+		return
+	}
+	avatar, err := s.store.GetLatestMediaByOwnerAndRole(profile.UserID, domain.MediaRoleAvatar)
+	if err == nil {
+		profile.AvatarURL = s.storage.PublicURL(avatar.FileKey)
+	}
 }

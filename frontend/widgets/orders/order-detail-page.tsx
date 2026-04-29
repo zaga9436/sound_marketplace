@@ -30,6 +30,11 @@ function formatPrice(value: number) {
   }).format(value);
 }
 
+function shortId(value?: string) {
+  if (!value) return "";
+  return value.slice(0, 8);
+}
+
 function getNextStep(orderStatus: string, user?: User | null, readyProduct = false) {
   if (orderStatus === "on_hold") {
     if (readyProduct) {
@@ -162,7 +167,7 @@ export function OrderDetailPage({ id }: { id: string }) {
       <section className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <OrderStatusBadge status={order.status} />
-          <Badge variant="outline">ID: {order.id}</Badge>
+          <Badge variant="outline">Заказ #{shortId(order.id)}</Badge>
           {readyProduct ? <Badge className="bg-slate-900 text-white hover:bg-slate-900">Готовый продукт</Badge> : null}
         </div>
 
@@ -179,8 +184,19 @@ export function OrderDetailPage({ id }: { id: string }) {
                 <Info label="Сумма" value={formatPrice(order.amount)} />
                 <Info label="Создан" value={new Date(order.created_at).toLocaleString("ru-RU")} />
                 <Info label="Последнее изменение" value={new Date(order.last_status_time).toLocaleString("ru-RU")} />
-                <Info label="Источник" value={order.card_id ? `Карточка ${order.card_id}` : order.request_id ? `Запрос ${order.request_id}` : "Сделка"} />
-                {order.bid_id ? <Info label="Связанный отклик" value={order.bid_id} /> : null}
+                <Info
+                  label="Основание заказа"
+                  value={
+                    sourceCard
+                      ? `${sourceCard.card_type === "offer" ? "Карточка предложения" : "Запрос заказчика"}: ${sourceCard.title}`
+                      : order.card_id
+                        ? "Карточка предложения"
+                        : order.request_id
+                          ? "Запрос заказчика"
+                          : "Сделка"
+                  }
+                />
+                {order.bid_id ? <Info label="Выбранный отклик" value={`#${shortId(order.bid_id)}`} /> : null}
                 {order.dispute_reason ? <Info label="Причина спора" value={order.dispute_reason} /> : null}
               </div>
 
@@ -325,7 +341,7 @@ export function OrderDetailPage({ id }: { id: string }) {
           <Card className="border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.24)]">
             <CardHeader>
               <CardTitle>Действия по статусу</CardTitle>
-              <CardDescription>Кнопки появляются только тогда, когда backend разрешает переход для вашей роли.</CardDescription>
+              <CardDescription>Здесь появляются шаги, которые доступны вам на текущем этапе сделки.</CardDescription>
             </CardHeader>
             <CardContent>
               <OrderStatusActions order={order} readyProduct={readyProduct} />

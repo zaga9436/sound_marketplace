@@ -22,13 +22,41 @@ func (h *MediaHandler) UploadPreview(w http.ResponseWriter, r *http.Request) {
 	h.upload(w, r, domain.MediaRolePreview)
 }
 
+func (h *MediaHandler) UploadCover(w http.ResponseWriter, r *http.Request) {
+	h.upload(w, r, domain.MediaRoleCover)
+}
+
 func (h *MediaHandler) UploadFull(w http.ResponseWriter, r *http.Request) {
 	h.upload(w, r, domain.MediaRoleFull)
+}
+
+func (h *MediaHandler) UploadMaterials(w http.ResponseWriter, r *http.Request) {
+	h.upload(w, r, domain.MediaRoleMaterial)
 }
 
 func (h *MediaHandler) DownloadFull(w http.ResponseWriter, r *http.Request) {
 	user := middleware.CurrentUser(r)
 	url, err := h.service.DownloadCardFullMedia(r.Context(), user, chi.URLParam(r, "id"))
+	if err != nil {
+		response.FromError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, map[string]string{"url": url})
+}
+
+func (h *MediaHandler) ListMaterials(w http.ResponseWriter, r *http.Request) {
+	user := middleware.CurrentUser(r)
+	materials, err := h.service.ListCardMaterials(r.Context(), user, chi.URLParam(r, "id"))
+	if err != nil {
+		response.FromError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, materials)
+}
+
+func (h *MediaHandler) DownloadMaterial(w http.ResponseWriter, r *http.Request) {
+	user := middleware.CurrentUser(r)
+	url, err := h.service.DownloadCardMaterial(r.Context(), user, chi.URLParam(r, "id"), chi.URLParam(r, "media_id"))
 	if err != nil {
 		response.FromError(w, err)
 		return

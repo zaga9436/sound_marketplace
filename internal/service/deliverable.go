@@ -36,7 +36,7 @@ func (s *DeliverableService) Upload(ctx context.Context, actor domain.User, orde
 		return domain.Deliverable{}, err
 	}
 	if strings.TrimSpace(input.ContentType) == "" {
-		input.ContentType = inferAudioContentType(input.Filename)
+		input.ContentType = inferDeliverableContentType(input.Filename)
 	}
 
 	var created domain.Deliverable
@@ -159,12 +159,19 @@ func (s *DeliverableService) validateUpload(input MediaUploadInput) error {
 	if ext == "" {
 		return apierr.BadRequest("file extension is required")
 	}
-	if !containsFold(s.cfg.AllowedAudioFormats, ext) {
-		return apierr.BadRequest("unsupported audio format")
+	if !containsFold(s.cfg.AllowedAudioFormats, ext) && ext != "zip" {
+		return apierr.BadRequest("unsupported deliverable format")
 	}
 	contentType := strings.ToLower(strings.TrimSpace(input.ContentType))
-	if contentType != "" && !strings.HasPrefix(contentType, "audio/") {
+	if contentType != "" && !strings.HasPrefix(contentType, "audio/") && contentType != "application/zip" && contentType != "application/x-zip-compressed" && contentType != "application/octet-stream" {
 		return apierr.BadRequest("unsupported content type")
 	}
 	return nil
+}
+
+func inferDeliverableContentType(filename string) string {
+	if strings.EqualFold(strings.TrimPrefix(filepath.Ext(filename), "."), "zip") {
+		return "application/zip"
+	}
+	return inferAudioContentType(filename)
 }

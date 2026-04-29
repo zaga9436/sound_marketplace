@@ -14,7 +14,8 @@ import (
 )
 
 type ProfileHandler struct {
-	service *service.ProfileService
+	service      *service.ProfileService
+	mediaService *service.MediaService
 }
 
 type updateProfileRequest struct {
@@ -22,8 +23,8 @@ type updateProfileRequest struct {
 	Bio         string `json:"bio"`
 }
 
-func NewProfileHandler(service *service.ProfileService) *ProfileHandler {
-	return &ProfileHandler{service: service}
+func NewProfileHandler(service *service.ProfileService, mediaService *service.MediaService) *ProfileHandler {
+	return &ProfileHandler{service: service, mediaService: mediaService}
 }
 
 func (h *ProfileHandler) Me(w http.ResponseWriter, r *http.Request) {
@@ -84,6 +85,32 @@ func (h *ProfileHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response.JSON(w, http.StatusOK, profile)
+}
+
+func (h *ProfileHandler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
+	user := middleware.CurrentUser(r)
+	if err := r.ParseMultipartForm(16 << 20); err != nil {
+		response.Error(w, http.StatusBadRequest, "invalid multipart form")
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		response.Error(w, http.StatusBadRequest, "file is required")
+		return
+	}
+	defer file.Close()
+
+	media, err := h.mediaService.UploadProfileAvatar(r.Context(), user, service.MediaUploadInput{
+		Filename:    header.Filename,
+		ContentType: header.Header.Get("Content-Type"),
+		SizeBytes:   header.Size,
+		Reader:      file,
+	})
+	if err != nil {
+		response.FromError(w, err)
+		return
+	}
+	response.JSON(w, http.StatusCreated, media)
 }
 
 func profileCardQueryFromRequest(r *http.Request) (domain.CardQuery, error) {

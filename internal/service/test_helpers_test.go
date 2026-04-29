@@ -14,15 +14,15 @@ import (
 )
 
 type fakeStore struct {
-	users              map[string]domain.User
-	cards              map[string]domain.Card
-	orders             map[string]domain.Order
-	disputes           map[string]domain.Dispute
-	payments           map[string]domain.Payment
-	deliverables       map[string][]domain.Deliverable
-	transactions       []domain.Transaction
-	moderationActions  []domain.ModerationAction
-	nextDeliverableID  int
+	users             map[string]domain.User
+	cards             map[string]domain.Card
+	orders            map[string]domain.Order
+	disputes          map[string]domain.Dispute
+	payments          map[string]domain.Payment
+	deliverables      map[string][]domain.Deliverable
+	transactions      []domain.Transaction
+	moderationActions []domain.ModerationAction
+	nextDeliverableID int
 }
 
 func newFakeStore() *fakeStore {
@@ -42,7 +42,9 @@ func (s *fakeStore) WithTx(fn func(repository.Store) error) error { return fn(s)
 func (s *fakeStore) CreateUser(email, passwordHash string, role domain.Role) (domain.User, domain.Profile, error) {
 	return domain.User{}, domain.Profile{}, errors.New("not implemented")
 }
-func (s *fakeStore) FindUserByEmail(email string) (domain.User, error) { return domain.User{}, repository.ErrNotFound }
+func (s *fakeStore) FindUserByEmail(email string) (domain.User, error) {
+	return domain.User{}, repository.ErrNotFound
+}
 func (s *fakeStore) GetUser(userID string) (domain.User, error) {
 	user, ok := s.users[userID]
 	if !ok {
@@ -61,7 +63,9 @@ func (s *fakeStore) SetUserSuspended(userID string, suspended bool, reason strin
 	s.users[userID] = user
 	return user, nil
 }
-func (s *fakeStore) GetProfile(userID string) (domain.Profile, error) { return domain.Profile{}, repository.ErrNotFound }
+func (s *fakeStore) GetProfile(userID string) (domain.Profile, error) {
+	return domain.Profile{}, repository.ErrNotFound
+}
 func (s *fakeStore) UpdateProfile(userID, displayName, bio string) (domain.Profile, error) {
 	return domain.Profile{}, errors.New("not implemented")
 }
@@ -76,7 +80,9 @@ func (s *fakeStore) CreateCard(card domain.Card) (domain.Card, error) {
 func (s *fakeStore) UpdateCard(cardID string, payload domain.Card) (domain.Card, error) {
 	return domain.Card{}, errors.New("not implemented")
 }
-func (s *fakeStore) ListCards(query domain.CardQuery) (domain.CardList, error) { return domain.CardList{}, nil }
+func (s *fakeStore) ListCards(query domain.CardQuery) (domain.CardList, error) {
+	return domain.CardList{}, nil
+}
 func (s *fakeStore) ListCardsForAdmin(query domain.CardQuery) (domain.CardList, error) {
 	return domain.CardList{}, nil
 }
@@ -102,6 +108,9 @@ func (s *fakeStore) ListMediaByCardAndRole(cardID string, role domain.MediaRole)
 	return []domain.MediaFile{}, nil
 }
 func (s *fakeStore) GetLatestMediaByCardAndRole(cardID string, role domain.MediaRole) (domain.MediaFile, error) {
+	return domain.MediaFile{}, repository.ErrNotFound
+}
+func (s *fakeStore) GetLatestMediaByOwnerAndRole(ownerUserID string, role domain.MediaRole) (domain.MediaFile, error) {
 	return domain.MediaFile{}, repository.ErrNotFound
 }
 func (s *fakeStore) CreateDeliverable(deliverable domain.Deliverable) (domain.Deliverable, error) {
@@ -147,15 +156,20 @@ func (s *fakeStore) DeactivateDeliverablesByOrder(orderID string) error {
 	s.deliverables[orderID] = items
 	return nil
 }
-func (s *fakeStore) UserHasCompletedCardAccess(cardID, userID string) (bool, error) { return false, nil }
-func (s *fakeStore) GetChatRoomByOrderID(orderID string) (string, error) { return "", repository.ErrNotFound }
+func (s *fakeStore) UserHasCompletedCardAccess(cardID, userID string) (bool, error) {
+	return false, nil
+}
+func (s *fakeStore) UserHasStartedCardAccess(cardID, userID string) (bool, error) { return false, nil }
+func (s *fakeStore) GetChatRoomByOrderID(orderID string) (string, error) {
+	return "", repository.ErrNotFound
+}
 func (s *fakeStore) CreateMessage(orderID, senderID, body string) (domain.ChatMessage, error) {
 	return domain.ChatMessage{}, errors.New("not implemented")
 }
 func (s *fakeStore) ListMessages(orderID, userID string, limit int, beforeID string) ([]domain.ChatMessage, error) {
 	return nil, nil
 }
-func (s *fakeStore) CountUnreadMessages(orderID, userID string) (int64, error) { return 0, nil }
+func (s *fakeStore) CountUnreadMessages(orderID, userID string) (int64, error)   { return 0, nil }
 func (s *fakeStore) MarkChatRead(orderID, userID string, readAt time.Time) error { return nil }
 func (s *fakeStore) ListConversationsByCustomer(userID string, limit int) ([]domain.Conversation, error) {
 	return nil, nil
@@ -164,16 +178,22 @@ func (s *fakeStore) ListConversationsByEngineer(userID string, limit int) ([]dom
 	return nil, nil
 }
 func (s *fakeStore) ListConversations(limit int) ([]domain.Conversation, error) { return nil, nil }
-func (s *fakeStore) CreateBid(bid domain.Bid) (domain.Bid, error) { return domain.Bid{}, errors.New("not implemented") }
-func (s *fakeStore) ListBidsByRequest(requestID string) ([]domain.Bid, error)   { return nil, nil }
+func (s *fakeStore) CreateBid(bid domain.Bid) (domain.Bid, error) {
+	return domain.Bid{}, errors.New("not implemented")
+}
+func (s *fakeStore) ListBidsByRequest(requestID string) ([]domain.Bid, error) { return nil, nil }
 func (s *fakeStore) ListBidsByRequestForAuthor(requestID, authorID string) ([]domain.Bid, error) {
 	return nil, nil
 }
-func (s *fakeStore) GetBid(bidID string) (domain.Bid, error) { return domain.Bid{}, repository.ErrNotFound }
+func (s *fakeStore) GetBid(bidID string) (domain.Bid, error) {
+	return domain.Bid{}, repository.ErrNotFound
+}
 func (s *fakeStore) GetBidByRequestAndEngineer(requestID, engineerID string) (domain.Bid, error) {
 	return domain.Bid{}, repository.ErrNotFound
 }
-func (s *fakeStore) CreateOrder(order domain.Order) (domain.Order, error) { return domain.Order{}, errors.New("not implemented") }
+func (s *fakeStore) CreateOrder(order domain.Order) (domain.Order, error) {
+	return domain.Order{}, errors.New("not implemented")
+}
 func (s *fakeStore) GetOrder(orderID string) (domain.Order, error) {
 	order, ok := s.orders[orderID]
 	if !ok {
@@ -181,13 +201,15 @@ func (s *fakeStore) GetOrder(orderID string) (domain.Order, error) {
 	}
 	return order, nil
 }
-func (s *fakeStore) GetOrderByBidID(bidID string) (domain.Order, error) { return domain.Order{}, repository.ErrNotFound }
+func (s *fakeStore) GetOrderByBidID(bidID string) (domain.Order, error) {
+	return domain.Order{}, repository.ErrNotFound
+}
 func (s *fakeStore) GetOrderByCardAndCustomer(cardID, customerID string) (domain.Order, error) {
 	return domain.Order{}, repository.ErrNotFound
 }
 func (s *fakeStore) ListOrdersByCustomer(customerID string) ([]domain.Order, error) { return nil, nil }
-func (s *fakeStore) ListOrdersByEngineer(engineerID string) ([]domain.Order, error)  { return nil, nil }
-func (s *fakeStore) ListOrders() ([]domain.Order, error)                              { return nil, nil }
+func (s *fakeStore) ListOrdersByEngineer(engineerID string) ([]domain.Order, error) { return nil, nil }
+func (s *fakeStore) ListOrders() ([]domain.Order, error)                            { return nil, nil }
 func (s *fakeStore) UpdateOrder(order domain.Order) (domain.Order, error) {
 	s.orders[order.ID] = order
 	return order, nil
@@ -262,11 +284,15 @@ func (s *fakeStore) CloseDispute(disputeID string, resolution domain.DisputeReso
 	s.disputes[dispute.OrderID] = dispute
 	return dispute, nil
 }
-func (s *fakeStore) CreateReview(review domain.Review) (domain.Review, error) { return domain.Review{}, errors.New("not implemented") }
+func (s *fakeStore) CreateReview(review domain.Review) (domain.Review, error) {
+	return domain.Review{}, errors.New("not implemented")
+}
 func (s *fakeStore) GetReviewByOrderAndAuthor(orderID, authorID string) (domain.Review, error) {
 	return domain.Review{}, repository.ErrNotFound
 }
-func (s *fakeStore) ListReviewsByTargetUser(targetUserID string) ([]domain.Review, error) { return nil, nil }
+func (s *fakeStore) ListReviewsByTargetUser(targetUserID string) ([]domain.Review, error) {
+	return nil, nil
+}
 func (s *fakeStore) RefreshProfileRating(userID string) (domain.Profile, error) {
 	return domain.Profile{}, errors.New("not implemented")
 }
@@ -277,7 +303,7 @@ func (s *fakeStore) ListNotifications(userID string, limit int, beforeID string)
 	return nil, nil
 }
 func (s *fakeStore) MarkNotificationsRead(userID string, ids []string) error { return nil }
-func (s *fakeStore) CountUnreadNotifications(userID string) (int64, error)    { return 0, nil }
+func (s *fakeStore) CountUnreadNotifications(userID string) (int64, error)   { return 0, nil }
 func (s *fakeStore) CreateModerationAction(action domain.ModerationAction) (domain.ModerationAction, error) {
 	s.moderationActions = append(s.moderationActions, action)
 	return action, nil
@@ -331,4 +357,3 @@ func (s *fakeStorage) GenerateSignedURL(ctx context.Context, key string, ttl tim
 	return "signed://" + key, nil
 }
 func (s *fakeStorage) PublicURL(key string) string { return "public://" + key }
-

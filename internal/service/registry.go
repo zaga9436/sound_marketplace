@@ -48,7 +48,7 @@ func NewRegistry(deps Dependencies) *Registry {
 	adminService := NewAdminService(deps.Store, disputeService, deps.StorageAdapter)
 
 	return &Registry{
-		Auth:        NewAuthService(deps.Store, deps.AuthManager),
+		Auth:        NewAuthService(deps.Store, deps.AuthManager, deps.StorageAdapter),
 		Profile:     NewProfileService(deps.Store, deps.StorageAdapter),
 		Card:        NewCardService(deps.Store, deps.Notifier, deps.StorageAdapter),
 		Bid:         NewBidService(deps.Store, deps.Notifier),

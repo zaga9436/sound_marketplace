@@ -33,6 +33,7 @@ const phraseLabels: Array<[RegExp, string]> = [
   [/New deliverable version uploaded/gi, "Загружена новая версия результата"],
   [/New deliverable uploaded/gi, "Загружен результат по заказу"],
   [/Payment succeeded/gi, "Платеж успешно зачислен"],
+  [/Balance replenished/gi, "Баланс успешно пополнен"],
   [/Order status changed/gi, "Статус заказа изменен"],
   [/Order created/gi, "Создан новый заказ"],
   [/New bid/gi, "Новый отклик"],

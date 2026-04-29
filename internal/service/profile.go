@@ -23,6 +23,7 @@ func (s *ProfileService) Get(userID string) (domain.Profile, error) {
 	if err != nil {
 		return domain.Profile{}, apierr.NotFound("profile not found")
 	}
+	s.attachAvatar(&profile)
 	return profile, nil
 }
 
@@ -34,7 +35,7 @@ func (s *ProfileService) ListCards(userID string, query domain.CardQuery) (domai
 	if err != nil {
 		return domain.CardList{}, err
 	}
-	if err := s.attachPreviewURLs(context.Background(), cards.Items); err != nil {
+	if err := s.attachCardMedia(context.Background(), cards.Items); err != nil {
 		return domain.CardList{}, err
 	}
 	if cards.Items == nil {
@@ -62,11 +63,28 @@ func (s *ProfileService) Update(userID, displayName, bio string) (domain.Profile
 	if err != nil {
 		return domain.Profile{}, apierr.NotFound("profile not found")
 	}
+	s.attachAvatar(&profile)
 	return profile, nil
 }
 
-func (s *ProfileService) attachPreviewURLs(_ context.Context, cards []domain.Card) error {
+func (s *ProfileService) attachAvatar(profile *domain.Profile) {
+	if profile == nil {
+		return
+	}
+	avatar, err := s.store.GetLatestMediaByOwnerAndRole(profile.UserID, domain.MediaRoleAvatar)
+	if err == nil {
+		profile.AvatarURL = s.storage.PublicURL(avatar.FileKey)
+	}
+}
+
+func (s *ProfileService) attachCardMedia(_ context.Context, cards []domain.Card) error {
 	for i := range cards {
+		cover, err := s.store.GetLatestMediaByCardAndRole(cards[i].ID, domain.MediaRoleCover)
+		if err == nil {
+			cards[i].CoverURL = s.storage.PublicURL(cover.FileKey)
+		} else if err != repository.ErrNotFound {
+			return err
+		}
 		mediaFiles, err := s.store.ListMediaByCardAndRole(cards[i].ID, domain.MediaRolePreview)
 		if err != nil {
 			return err

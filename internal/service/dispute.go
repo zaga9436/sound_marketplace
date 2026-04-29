@@ -124,7 +124,7 @@ func (s *DisputeService) Close(actor domain.User, orderID string, resolution dom
 				UserID:  order.EngineerID,
 				OrderID: order.ID,
 				Type:    domain.TransactionTypeRelease,
-				Amount:  order.Amount,
+				Amount:  engineerPayoutAmount(order.Amount),
 			}); err != nil {
 				return err
 			}

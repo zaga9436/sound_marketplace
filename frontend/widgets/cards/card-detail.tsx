@@ -58,7 +58,7 @@ export function CardDetail({ id }: { id: string }) {
         <Card className="overflow-hidden border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-32px_rgba(15,23,42,0.32)]">
           <div className="p-4 pb-0">
             {showAudioPreview ? (
-              <AudioCoverPreview coverUrl={card.cover_url} audioUrl={preview} title={card.title} className="aspect-[16/9]" />
+              <AudioCoverPreview coverUrl={card.cover_url} audioUrl={preview} title={card.title} showTitle={false} className="aspect-[16/9]" />
             ) : (
               <div
                 className="relative flex aspect-[16/9] items-end overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(145deg,rgba(15,23,42,0.92),rgba(51,65,85,0.9))] p-6 text-white"
@@ -76,7 +76,6 @@ export function CardDetail({ id }: { id: string }) {
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/14 backdrop-blur">
                     <Music2 className="h-5 w-5" />
                   </div>
-                  <p className="max-w-2xl text-2xl font-semibold leading-tight">{card.title}</p>
                 </div>
               </div>
             )}

@@ -19,6 +19,17 @@ function formatPrice(value: number) {
   }).format(value);
 }
 
+function shortId(value?: string) {
+  if (!value) return "";
+  return value.slice(0, 8);
+}
+
+function sourceLabel(order: { card_id?: string; request_id?: string }) {
+  if (order.card_id) return `Карточка предложения #${shortId(order.card_id)}`;
+  if (order.request_id) return `Запрос заказчика #${shortId(order.request_id)}`;
+  return "Сделка";
+}
+
 export function OrdersPage() {
   const user = useAuthStore((state) => state.user);
   const query = useQuery({
@@ -58,7 +69,7 @@ export function OrdersPage() {
         </Badge>
         <div className="space-y-2">
           <h1>{title}</h1>
-          <p>Здесь собраны все заказы, связанные с вашей ролью в SoundMarket. Отсюда удобно переходить в детали сделки и выполнять доступные действия.</p>
+          <p>Здесь собраны все заказы, связанные с вашей ролью в SoundMarket. Отсюда удобно переходить в детали сделки и продолжать работу.</p>
         </div>
       </section>
 
@@ -84,11 +95,11 @@ export function OrdersPage() {
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <OrderStatusBadge status={order.status} />
-                    <Badge variant="outline">ID: {order.id}</Badge>
+                    <Badge variant="outline">Заказ #{shortId(order.id)}</Badge>
                   </div>
                   <CardTitle className="text-2xl">Заказ на {formatPrice(order.amount)}</CardTitle>
                   <CardDescription className="text-sm text-slate-500">
-                    Создан {new Date(order.created_at).toLocaleDateString("ru-RU")} • заказчик {order.customer_id} • исполнитель {order.engineer_id}
+                    Создан {new Date(order.created_at).toLocaleDateString("ru-RU")} • заказчик #{shortId(order.customer_id)} • исполнитель #{shortId(order.engineer_id)}
                   </CardDescription>
                 </div>
                 <Button asChild className="rounded-2xl bg-slate-900 text-white hover:bg-slate-800">
@@ -97,8 +108,8 @@ export function OrdersPage() {
               </CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-3">
                 <div>
-                  <p className="text-sm text-slate-500">Источник</p>
-                  <p className="text-sm font-medium text-slate-900">{order.card_id ? `Карточка ${order.card_id}` : order.request_id ? `Запрос ${order.request_id}` : "Сделка"}</p>
+                  <p className="text-sm text-slate-500">Основание заказа</p>
+                  <p className="text-sm font-medium text-slate-900">{sourceLabel(order)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-slate-500">Последнее обновление</p>

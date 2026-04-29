@@ -61,6 +61,7 @@ type Profile struct {
 	UserID       string    `json:"user_id"`
 	DisplayName  string    `json:"display_name"`
 	Bio          string    `json:"bio"`
+	AvatarURL    string    `json:"avatar_url,omitempty"`
 	Rating       float64   `json:"rating"`
 	ReviewsCount int       `json:"reviews_count"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -75,6 +76,7 @@ type Card struct {
 	Description      string    `json:"description"`
 	Price            int64     `json:"price"`
 	Tags             []string  `json:"tags"`
+	CoverURL         string    `json:"cover_url,omitempty"`
 	PreviewURLs      []string  `json:"preview_urls"`
 	IsPublished      bool      `json:"is_published"`
 	IsHidden         bool      `json:"is_hidden"`
@@ -115,7 +117,7 @@ type Bid struct {
 }
 
 type Order struct {
-	ID            string      `json:"id"`
+	ID             string      `json:"id"`
 	CardID         string      `json:"card_id,omitempty"`
 	RequestID      string      `json:"request_id,omitempty"`
 	BidID          string      `json:"bid_id,omitempty"`
@@ -167,14 +169,14 @@ const (
 )
 
 type Dispute struct {
-	ID             string             `json:"id"`
-	OrderID        string             `json:"order_id"`
-	OpenedByUserID string             `json:"opened_by_user_id"`
-	Reason         string             `json:"reason"`
-	Status         DisputeStatus      `json:"status"`
-	Resolution     DisputeResolution  `json:"resolution,omitempty"`
-	CreatedAt      time.Time          `json:"created_at"`
-	ClosedAt       *time.Time         `json:"closed_at,omitempty"`
+	ID             string            `json:"id"`
+	OrderID        string            `json:"order_id"`
+	OpenedByUserID string            `json:"opened_by_user_id"`
+	Reason         string            `json:"reason"`
+	Status         DisputeStatus     `json:"status"`
+	Resolution     DisputeResolution `json:"resolution,omitempty"`
+	CreatedAt      time.Time         `json:"created_at"`
+	ClosedAt       *time.Time        `json:"closed_at,omitempty"`
 }
 
 type Review struct {
@@ -190,8 +192,11 @@ type Review struct {
 type MediaRole string
 
 const (
-	MediaRolePreview MediaRole = "preview"
-	MediaRoleFull    MediaRole = "full"
+	MediaRoleAvatar   MediaRole = "avatar"
+	MediaRoleCover    MediaRole = "cover"
+	MediaRolePreview  MediaRole = "preview"
+	MediaRoleFull     MediaRole = "full"
+	MediaRoleMaterial MediaRole = "material"
 )
 
 type MediaFile struct {
@@ -231,13 +236,13 @@ type ChatMessage struct {
 }
 
 type Conversation struct {
-	OrderID        string     `json:"order_id"`
-	ChatRoomID     string     `json:"chat_room_id"`
-	CustomerID     string     `json:"customer_id"`
-	EngineerID     string     `json:"engineer_id"`
-	LastMessage    string     `json:"last_message,omitempty"`
-	LastMessageAt  *time.Time `json:"last_message_at,omitempty"`
-	UnreadCount    int64      `json:"unread_count"`
+	OrderID       string     `json:"order_id"`
+	ChatRoomID    string     `json:"chat_room_id"`
+	CustomerID    string     `json:"customer_id"`
+	EngineerID    string     `json:"engineer_id"`
+	LastMessage   string     `json:"last_message,omitempty"`
+	LastMessageAt *time.Time `json:"last_message_at,omitempty"`
+	UnreadCount   int64      `json:"unread_count"`
 }
 
 type Notification struct {

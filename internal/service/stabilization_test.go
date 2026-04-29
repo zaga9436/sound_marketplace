@@ -35,6 +35,9 @@ func TestOrderLifecycleReleaseOnComplete(t *testing.T) {
 	if len(store.transactions) != 1 || store.transactions[0].Type != domain.TransactionTypeRelease {
 		t.Fatalf("expected one release transaction, got %#v", store.transactions)
 	}
+	if got, want := store.transactions[0].Amount, int64(2250); got != want {
+		t.Fatalf("expected engineer payout %d after commission, got %d", want, got)
+	}
 }
 
 func TestDisputeCancelFlowRefundsCustomer(t *testing.T) {
@@ -66,6 +69,33 @@ func TestDisputeCancelFlowRefundsCustomer(t *testing.T) {
 	}
 	if len(store.transactions) != 1 || store.transactions[0].Type != domain.TransactionTypeRefund {
 		t.Fatalf("expected refund transaction, got %#v", store.transactions)
+	}
+}
+
+func TestDisputeCompleteFlowReleasesNetAmount(t *testing.T) {
+	store := newFakeStore()
+	notifier := &fakeNotifier{}
+	service := NewDisputeService(store, notifier)
+	store.users["customer-1"] = domain.User{ID: "customer-1", Role: domain.RoleCustomer}
+	store.orders["order-1"] = domain.Order{
+		ID:         "order-1",
+		CustomerID: "customer-1",
+		EngineerID: "engineer-1",
+		Amount:     3000,
+		Status:     domain.OrderStatusOnHold,
+	}
+
+	if _, err := service.Open(domain.User{ID: "customer-1", Role: domain.RoleCustomer}, "order-1", "Need resolution"); err != nil {
+		t.Fatalf("expected dispute open to succeed: %v", err)
+	}
+	if _, err := service.Close(domain.User{ID: "customer-1", Role: domain.RoleCustomer}, "order-1", domain.DisputeResolutionCompleteOrder); err != nil {
+		t.Fatalf("expected dispute close to succeed: %v", err)
+	}
+	if len(store.transactions) != 1 || store.transactions[0].Type != domain.TransactionTypeRelease {
+		t.Fatalf("expected release transaction, got %#v", store.transactions)
+	}
+	if got, want := store.transactions[0].Amount, int64(2700); got != want {
+		t.Fatalf("expected engineer payout %d after commission, got %d", want, got)
 	}
 }
 

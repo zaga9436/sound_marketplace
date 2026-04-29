@@ -103,7 +103,7 @@ func (s *AdminService) ListCards(actor domain.User, query domain.CardQuery) (dom
 	if err != nil {
 		return domain.CardList{}, err
 	}
-	if err := s.attachPreviewURLs(context.Background(), cards.Items); err != nil {
+	if err := s.attachCardMedia(context.Background(), cards.Items); err != nil {
 		return domain.CardList{}, err
 	}
 	if cards.Items == nil {
@@ -121,7 +121,7 @@ func (s *AdminService) GetCard(actor domain.User, cardID string) (domain.Card, e
 		return domain.Card{}, apierr.NotFound("card not found")
 	}
 	cards := []domain.Card{card}
-	if err := s.attachPreviewURLs(context.Background(), cards); err != nil {
+	if err := s.attachCardMedia(context.Background(), cards); err != nil {
 		return domain.Card{}, err
 	}
 	return cards[0], nil
@@ -234,8 +234,14 @@ func (s *AdminService) ListModerationActions(actor domain.User, targetType, targ
 	return actions, nil
 }
 
-func (s *AdminService) attachPreviewURLs(_ context.Context, cards []domain.Card) error {
+func (s *AdminService) attachCardMedia(_ context.Context, cards []domain.Card) error {
 	for i := range cards {
+		cover, err := s.store.GetLatestMediaByCardAndRole(cards[i].ID, domain.MediaRoleCover)
+		if err == nil {
+			cards[i].CoverURL = s.storage.PublicURL(cover.FileKey)
+		} else if err != repository.ErrNotFound {
+			return err
+		}
 		mediaFiles, err := s.store.ListMediaByCardAndRole(cards[i].ID, domain.MediaRolePreview)
 		if err != nil {
 			return err
